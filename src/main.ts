@@ -87,7 +87,7 @@ window.addEventListener('DOMContentLoaded', () => {
     if (e.code === 'ArrowUp' || e.code === 'KeyW') {
       e.preventDefault();
       sound.ensureContext();
-      if (!game.stats.gameOver) {
+      if (!game.stats.gameOver && !e.repeat) {
         jumpPressed = true;
         sound.playJump();
       }
@@ -125,6 +125,11 @@ window.addEventListener('DOMContentLoaded', () => {
     if (game.stats.fishCount > lastFishCount) {
       sound.playFishPickup();
       lastFishCount = game.stats.fishCount;
+    }
+
+    if (game.crashEvent) {
+      sound.playLanding();
+      sound.playBrakingScrape();
     }
 
     if (game.speedBoostPickedUp) {

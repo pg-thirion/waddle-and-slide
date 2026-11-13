@@ -42,6 +42,18 @@ describe('ObstacleManager', () => {
     expect(manager.sealPowerUpsBetween(50, 150)).toHaveLength(0);
   });
 
+  it('spawns high aerial rewards and magnet attracts only fish', () => {
+    const terrain = new TerrainGenerator();
+    const manager = new ObstacleManager();
+    manager.spawnAhead(100, terrain);
+    expect(manager.entities.some(e => terrain.getHeightAt(e.position.x) - e.position.y >= 150)).toBe(true);
+    manager.entities = [
+      { id: 1, type: 'FISH', position: { x: 120, y: 0 }, radius: 16 },
+      { id: 2, type: 'WALRUS', position: { x: 120, y: 0 }, radius: 32 }
+    ];
+    expect(manager.checkCollisions({ x: 0, y: 0 }, 16, { x: 0, y: 0 }, 145).map(e => e.id)).toEqual([1]);
+  });
+
   it('Review Focus #5: handles multiple simultaneous pickup collisions in one step', () => {
     const manager = new ObstacleManager();
     manager.entities = [

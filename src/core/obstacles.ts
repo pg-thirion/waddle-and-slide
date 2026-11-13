@@ -18,6 +18,17 @@ export class ObstacleManager {
       position: { x, y: terrain.getHeightAt(x) - offset }, radius });
   }
 
+  private aerialTrail(x: number, terrain: TerrainGenerator, index: number): void {
+    // A trail climbs toward a high-value pickup, then descends.
+    const offsets = [55, 105, 155, 195, 155, 105, 55];
+    for (let i = 0; i < offsets.length; i++) {
+      const type: EntityType = i === 3
+        ? (['SKY_ROCKET', 'MAGNET', 'SHIELD', 'GOLD_FISH'] as const)[Math.floor(this.random(index, 7) * 4)]
+        : 'FISH';
+      this.add(type, x + i * 52, offsets[i], i === 3 ? 25 : 16, terrain);
+    }
+  }
+
   spawnAhead(playerX: number, terrain: TerrainGenerator): void {
     const targetAheadX = playerX + 2500;
     while (this.lastSpawnX < targetAheadX) {
@@ -30,17 +41,26 @@ export class ObstacleManager {
       const slope = terrain.getSlopeAngleAt(x);
       // A gentle opening, then a varied mix with a growing hazard share.
       if (index === 1 || (index > 3 && roll < 0.25 - difficulty * 0.08)) {
+        // Ground fish are reachable without jumping; the high trail rewards jumping.
         for (let i = 0; i < 3; i++) {
-          this.add('FISH', x + i * 40, 25 + Math.sin(i * Math.PI / 2) * 45, 12, terrain);
+          this.add('FISH', x + i * 38, 8, 16, terrain);
         }
+        this.aerialTrail(x + 110, terrain, index);
       } else if (index === 0 || (index > 3 && roll < 0.43 - difficulty * 0.13)) {
         this.add('SPEED_PAD', x, 12, 20, terrain);
       } else if (index === 2 || (index > 3 && roll < 0.56 - difficulty * 0.12 && slope > 0.08)) {
         this.add('RAMP', x, 10, 20, terrain);
+        // Ramp launches create a second aerial path at typical boost speeds.
+        this.add('FISH', x + 120, 95, 20, terrain);
+        this.add('FISH', x + 220, 155, 20, terrain);
+        this.add('SKY_ROCKET', x + 320, 190, 28, terrain);
+        this.add('FISH', x + 420, 170, 20, terrain);
+        this.add('GOLD_FISH', x + 490, 130, 23, terrain);
       } else if (index === 3 || this.random(index, 3) < 0.46 + difficulty * 0.20) {
         this.add('ICE_HURDLE', x, 24, 24, terrain);
-      } else if (Math.abs(slope) < 0.25 && this.random(index, 4) < 0.45) {
-        this.add('WALRUS', x, 18, 24, terrain);
+        this.add('GOLD_FISH', x + 25, 135, 23, terrain);
+      } else if (index % 5 === 4 || (Math.abs(slope) < 0.35 && this.random(index, 4) < 0.55)) {
+        this.add('WALRUS', x, 16, 32, terrain);
       } else {
         this.add('BOULDER', x, 14, 16, terrain);
       }
@@ -60,7 +80,7 @@ export class ObstacleManager {
     );
   }
 
-  checkCollisions(playerPos: Vector2, playerRadius: number, previousPos = playerPos): WorldEntity[] {
+  checkCollisions(playerPos: Vector2, playerRadius: number, previousPos = playerPos, magnetRadius = 0): WorldEntity[] {
     const hits: WorldEntity[] = [];
     const vx = playerPos.x - previousPos.x;
     const vy = playerPos.y - previousPos.y;
@@ -72,7 +92,8 @@ export class ObstacleManager {
         ((entity.position.x - previousPos.x) * vx + (entity.position.y - previousPos.y) * vy) / lengthSq));
       const dx = previousPos.x + t * vx - entity.position.x;
       const dy = previousPos.y + t * vy - entity.position.y;
-      const maxDist = playerRadius + entity.radius;
+      const fish = entity.type === 'FISH' || entity.type === 'GOLD_FISH';
+      const maxDist = playerRadius + entity.radius + (fish ? 8 + magnetRadius : 0);
       if (dx * dx + dy * dy <= maxDist * maxDist) hits.push(entity);
     }
     return hits;

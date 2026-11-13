@@ -11,7 +11,10 @@ export class HudRenderer {
     boostTimer: number,
     sealDistance = 350,
     sealBoosting = false,
-    nextHazard?: number
+    nextHazard?: number,
+    magnetTimer = 0,
+    shieldActive = false,
+    crashTimer = 0
   ): void {
     ctx.save();
 
@@ -53,10 +56,24 @@ export class HudRenderer {
     }
 
     if (!stats.gameOver) {
+      ctx.font = 'bold 12px sans-serif';
+      ctx.textAlign = 'right';
+      if (magnetTimer > 0) {
+        ctx.fillStyle = '#ffd65b';
+        ctx.fillText(`MAGNET ${magnetTimer.toFixed(1)}s`, width - 20, 72);
+      }
+      if (shieldActive) {
+        ctx.fillStyle = '#7dfbff';
+        ctx.fillText('SHIELD READY', width - 20, 90);
+      }
       ctx.textAlign = 'center';
       ctx.font = 'bold 13px sans-serif';
       ctx.fillStyle = sealBoosting ? '#ffb34d' : '#ffffff';
       ctx.fillText(sealBoosting ? 'SEAL BOOSTING!' : `SEAL: ${Math.ceil(sealDistance / 10)} m`, width / 2, 96);
+      if (crashTimer > 0) {
+        ctx.fillStyle = '#ff7968';
+        ctx.fillText('RECOVERING...', width / 2, 136);
+      }
       if (nextHazard !== undefined && nextHazard < 900) {
         ctx.fillStyle = '#ffe18a';
         ctx.fillText(`HAZARD AHEAD: ${Math.ceil(nextHazard / 10)} m`, width / 2, 116);

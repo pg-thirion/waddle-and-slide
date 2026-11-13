@@ -13,7 +13,7 @@ export interface PlayerInput {
 
 export type ThreatLevel = 'CALM' | 'YELLOW' | 'RED' | 'CAUGHT';
 
-export type EntityType = 'BOULDER' | 'WALRUS' | 'FISH' | 'SPEED_PAD' | 'RAMP' | 'ICE_HURDLE';
+export type EntityType = 'BOULDER' | 'WALRUS' | 'FISH' | 'SPEED_PAD' | 'RAMP' | 'ICE_HURDLE' | 'GOLD_FISH' | 'SKY_ROCKET' | 'MAGNET' | 'SHIELD';
 
 export interface WorldEntity {
   id: number;
