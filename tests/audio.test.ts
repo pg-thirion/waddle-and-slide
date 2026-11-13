@@ -6,5 +6,7 @@ describe('SoundEngine', () => {
     const sound = new SoundEngine();
     expect(() => sound.playFishPickup()).not.toThrow();
     expect(() => sound.playSlideWoosh(0.5)).not.toThrow();
+    sound.setMuted(true);
+    expect(sound.ensureContext()).toBe(null);
   });
 });

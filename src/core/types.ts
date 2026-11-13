@@ -9,6 +9,7 @@ export interface PlayerInput {
   isHoldingSlide: boolean;
   isDiveRequested?: boolean;
   jumpPressed?: boolean;
+  speedLimit?: number;
 }
 
 export type ThreatLevel = 'CALM' | 'YELLOW' | 'RED' | 'CAUGHT';
@@ -31,4 +32,7 @@ export interface GameStats {
   fishCount: number;
   highScore: number;
   gameOver: boolean;
+  bestDistance: number;
+  elapsedSeconds: number;
+  hazardsCleared: number;
 }

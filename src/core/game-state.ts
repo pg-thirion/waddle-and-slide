@@ -1,4 +1,4 @@
-import { GameStats } from './types';
+import { GameStats, PlayerInput } from './types';
 import { vec2 } from './vector';
 import { TerrainGenerator } from './terrain';
 import { PenguinPlayer } from './player';
@@ -6,6 +6,17 @@ import { LeopardSeal } from './chaser';
 import { ObstacleManager } from './obstacles';
 
 const STORAGE_KEY = 'waddle_and_slide_highscore';
+const DISTANCE_KEY = 'waddle_and_slide_bestdistance';
+
+function loadBestDistance(): number {
+  try {
+    return Math.max(0, Number(localStorage.getItem(DISTANCE_KEY)) || 0);
+  } catch { return 0; }
+}
+
+function saveBestDistance(distance: number): void {
+  try { localStorage.setItem(DISTANCE_KEY, String(distance)); } catch { /* unavailable */ }
+}
 
 function loadHighScore(): number {
   try {
@@ -45,6 +56,10 @@ export class GameSimulation {
   pickupMessage = '';
   pickupMessageTimer = 0;
   airTime = 0;
+  landedEvent = false;
+  jumpEvent = false;
+  private lastMilestone = 0;
+  private clearedHazards = new Set<number>();
 
   constructor() {
     this.terrain = new TerrainGenerator();
@@ -61,6 +76,9 @@ export class GameSimulation {
       distanceMeters: 0,
       fishCount: 0,
       highScore: loadHighScore(),
+      bestDistance: loadBestDistance(),
+      elapsedSeconds: 0,
+      hazardsCleared: 0,
       gameOver: false
     };
 
@@ -68,17 +86,19 @@ export class GameSimulation {
     this.obstacles.spawnAhead(startX, this.terrain);
   }
 
-  step(dt: number, input: { isHoldingSlide: boolean; jumpPressed?: boolean }): void {
+  step(dt: number, input: PlayerInput): void {
     this.crashEvent = false;
     this.speedBoostPickedUp = false;
+    this.landedEvent = false;
+    this.jumpEvent = false;
     if (this.stats.gameOver) return;
     if (!Number.isFinite(dt) || dt <= 0) return;
 
     // Substep to ensure stable simulation over variable or large dt
-    const maxSubstep = 0.05;
+    const maxSubstep = 1 / 120;
     let remaining = Math.min(dt, 1.5);
 
-    while (remaining > 0 && !this.stats.gameOver) {
+    while (remaining > 1e-9 && !this.stats.gameOver) {
       const stepDt = Math.min(remaining, maxSubstep);
       this.singleStep(stepDt, input);
       input = { ...input, jumpPressed: false };
@@ -86,10 +106,13 @@ export class GameSimulation {
     }
   }
 
-  private singleStep(dt: number, input: { isHoldingSlide: boolean; jumpPressed?: boolean }): void {
+  private singleStep(dt: number, input: PlayerInput): void {
+    this.stats.elapsedSeconds += dt;
+    const recovering = this.crashTimer > 0;
     this.magnetTimer = Math.max(0, this.magnetTimer - dt);
     this.crashTimer = Math.max(0, this.crashTimer - dt);
     this.pickupMessageTimer = Math.max(0, this.pickupMessageTimer - dt);
+    if (recovering) this.boostTimer = 0;
     if (this.boostTimer > 0) {
       this.boostTimer = Math.max(0, this.boostTimer - dt);
       this.player.velocity.x = Math.max(this.player.velocity.x, 800);
@@ -97,7 +120,9 @@ export class GameSimulation {
 
     const previousPos = { ...this.player.position };
     const previousSealX = previousPos.x - this.chaser.trailingDistance;
-    this.player.update(dt, input, this.terrain);
+    this.player.update(dt, { ...input, speedLimit: recovering ? 95 : 1500 }, this.terrain);
+    this.landedEvent ||= this.player.justLanded;
+    this.jumpEvent ||= this.player.justJumped;
     if (this.player.state === 'AIRBORNE') this.airTime += dt;
     else if (this.airTime > 0) {
       if (this.airTime >= 0.8) {
@@ -123,10 +148,11 @@ export class GameSimulation {
             this.boostTimer = Math.max(this.boostTimer, 1.2);
             this.speedBoostPickedUp = true;
             this.announce('FISH FRENZY!');
-          } else this.announce(gold ? 'GOLD FISH +500' : 'FISH +100');
+          } else this.announce(`${gold ? 'GOLD FISH' : 'FISH'} +${(gold ? 500 : 100) * this.player.comboMultiplier}`, false);
         }
       } else if (hit.type === 'SKY_ROCKET' && !hit.collected) {
         hit.collected = true;
+        if (recovering) continue;
         this.boostTimer = Math.max(this.boostTimer, 2.2);
         this.player.velocity.x = Math.max(this.player.velocity.x, 1100);
         this.speedBoostPickedUp = true;
@@ -161,15 +187,18 @@ export class GameSimulation {
         this.player.comboMultiplier = 1;
       } else if (hit.type === 'SPEED_PAD' && !hit.collected) {
         hit.collected = true;
+        if (recovering) continue;
         this.boostTimer = 3.0;
         this.player.velocity.x = Math.max(this.player.velocity.x, 950);
         this.speedBoostPickedUp = true;
       } else if (hit.type === 'RAMP' && !hit.collected) {
         hit.collected = true;
+        if (recovering || this.crashTimer > 0) continue;
         this.player.velocity.y = -800;
         this.player.velocity.x = Math.max(480, this.player.velocity.x);
         this.player.state = 'AIRBORNE';
         this.player.position.y -= 2;
+        this.jumpEvent = true;
         this.announce('RAMP LAUNCH!');
         this.player.comboMultiplier = Math.min(this.player.comboMultiplier + 1, 5);
       }
@@ -191,32 +220,57 @@ export class GameSimulation {
         this.chaser.usePowerUp(powerUp.type);
       }
     }
+    // Reward clean clears once, even when several simulation steps happen in one frame.
+    for (const entity of this.obstacles.entities) {
+      if (entity.type !== 'BOULDER' && entity.type !== 'WALRUS' && entity.type !== 'ICE_HURDLE') continue;
+      const exitX = entity.position.x + entity.radius + 18;
+      if (!entity.hit && !this.clearedHazards.has(entity.id) && previousPos.x < exitX && this.player.position.x >= exitX) {
+        this.clearedHazards.add(entity.id);
+        this.stats.hazardsCleared++;
+        this.rawScore += 150 * this.player.comboMultiplier;
+        this.announce('CLEAN CLEAR!', false);
+      }
+    }
     this.obstacles.cullBehind(this.player.position.x, sealX);
+    const liveIds = new Set(this.obstacles.entities.map(e => e.id));
+    for (const id of this.clearedHazards) if (!liveIds.has(id)) this.clearedHazards.delete(id);
     if (this.chaser.isCaught) this.stats.gameOver = true;
 
     // Distance and score metrics
     const distPx = Math.max(0, this.player.position.x - 100);
     this.stats.distanceMeters = Math.floor(distPx / 10);
-    this.rawScore += this.player.velocity.x * dt * 0.2 * this.player.comboMultiplier;
-    this.stats.score = Math.floor(this.rawScore);
-    if (this.stats.gameOver && this.stats.score > this.stats.highScore) {
-      this.stats.highScore = this.stats.score;
-      saveHighScore(this.stats.highScore);
+    this.rawScore += Math.max(0, this.player.position.x - previousPos.x) * 0.2 * this.player.comboMultiplier;
+    const milestone = Math.floor(this.stats.distanceMeters / 500);
+    if (milestone > this.lastMilestone) {
+      this.lastMilestone = milestone;
+      this.rawScore += 250;
+      this.announce(`${milestone * 500} m! +250`, false);
     }
+    this.stats.score = Math.floor(this.rawScore);
+    if (this.stats.gameOver) this.saveRecords();
   }
 
-  private announce(message: string): void {
+  private announce(message: string, priority = true): void {
+    if (!priority && this.pickupMessageTimer > 0.25) return;
     this.pickupMessage = message;
     this.pickupMessageTimer = 0.9;
   }
 
-  restart(): void {
+  private saveRecords(): void {
     if (this.stats.score > this.stats.highScore) {
       this.stats.highScore = this.stats.score;
       saveHighScore(this.stats.highScore);
     }
+    if (this.stats.distanceMeters > this.stats.bestDistance) {
+      this.stats.bestDistance = this.stats.distanceMeters;
+      saveBestDistance(this.stats.bestDistance);
+    }
+  }
 
+  restart(): void {
+    this.saveRecords();
     const highScore = this.stats.highScore;
+    const bestDistance = this.stats.bestDistance;
     const startX = 100;
     this.player = new PenguinPlayer(vec2(startX, this.terrain.getHeightAt(startX)));
     this.chaser = new LeopardSeal(350);
@@ -229,6 +283,10 @@ export class GameSimulation {
     this.pickupMessage = '';
     this.pickupMessageTimer = 0;
     this.airTime = 0;
+    this.landedEvent = false;
+    this.jumpEvent = false;
+    this.lastMilestone = 0;
+    this.clearedHazards.clear();
     this.boostTimer = 0;
     this.speedBoostPickedUp = false;
     this.rawScore = 0;
@@ -238,6 +296,9 @@ export class GameSimulation {
       distanceMeters: 0,
       fishCount: 0,
       highScore,
+      bestDistance,
+      elapsedSeconds: 0,
+      hazardsCleared: 0,
       gameOver: false
     };
   }

@@ -1,23 +1,19 @@
 export class SoundEngine {
   private ctx: AudioContext | null = null;
   private noiseBuffer: AudioBuffer | null = null;
+  muted = false;
 
   constructor(customContext?: AudioContext) {
-    if (customContext) {
-      this.ctx = customContext;
-    } else if (typeof window !== 'undefined') {
-      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-      if (AudioCtx) {
-        try {
-          this.ctx = new AudioCtx();
-        } catch {
-          this.ctx = null;
-        }
-      }
-    }
+    if (customContext) this.ctx = customContext;
+  }
+
+  setMuted(muted: boolean): void {
+    this.muted = muted;
+    if (muted && this.ctx?.state === 'running') void this.ctx.suspend().catch(() => {});
   }
 
   ensureContext(): AudioContext | null {
+    if (this.muted) return null;
     if (!this.ctx && typeof window !== 'undefined') {
       const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       if (AudioCtx) {
@@ -59,7 +55,7 @@ export class SoundEngine {
       osc.frequency.setValueAtTime(80 + speedRatio * 160, now);
       osc.frequency.exponentialRampToValueAtTime(140 + speedRatio * 200, now + 0.15);
 
-      gain.gain.setValueAtTime(0.08 * speedRatio, now);
+      gain.gain.setValueAtTime(Math.max(0.001, 0.08 * Math.min(1.5, Math.max(0, speedRatio))), now);
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
 
       osc.connect(gain);

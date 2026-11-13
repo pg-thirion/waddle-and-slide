@@ -21,7 +21,6 @@ export class CanvasView {
   private particles: Particle[];
   private shakeTimer: number;
   private shakeIntensity: number;
-  private prevPlayerState: string;
   private comboFlashTimer: number;
   private prevCombo: number;
 
@@ -35,13 +34,12 @@ export class CanvasView {
     this.particles = [];
     this.shakeTimer = 0;
     this.shakeIntensity = 0;
-    this.prevPlayerState = 'WADDLE_BRAKE';
     this.comboFlashTimer = 0;
     this.prevCombo = 1;
   }
 
   resize(): void {
-    const dpr = window.devicePixelRatio || 1;
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
     const width = window.innerWidth;
     const height = window.innerHeight;
     this.canvas.width = width * dpr;
@@ -52,20 +50,42 @@ export class CanvasView {
     this.ctx.scale(dpr, dpr);
   }
 
+  reset(game: GameSimulation): void {
+    this.camera = { x: game.player.position.x - this.worldWidth() * 0.24,
+      y: game.player.position.y - this.worldHeight() * 0.58 };
+    this.particles = [];
+    this.shakeTimer = 0;
+    this.shakeIntensity = 0;
+    this.comboFlashTimer = 0;
+    this.prevCombo = 1;
+  }
+
+  private worldScale(): number {
+    return Math.min(1, window.innerWidth / 760);
+  }
+
+  private worldWidth(): number { return window.innerWidth / this.worldScale(); }
+  private worldHeight(): number { return window.innerHeight / this.worldScale(); }
+
   render(game: GameSimulation, dt: number): void {
     const width = window.innerWidth;
     const height = window.innerHeight;
 
     // Camera follow lerp
-    const targetCamX = game.player.position.x - width * 0.28;
-    const targetCamY = game.player.position.y - height * 0.55;
-    this.camera.x += (targetCamX - this.camera.x) * 0.12;
-    this.camera.y += (targetCamY - this.camera.y) * 0.08;
+    const scale = this.worldScale();
+    const worldWidth = this.worldWidth();
+    const worldHeight = this.worldHeight();
+    const targetCamX = game.player.position.x - worldWidth * 0.24;
+    const targetCamY = game.player.position.y - worldHeight * 0.58;
+    this.camera.x += (targetCamX - this.camera.x) * (1 - Math.exp(-dt * 12));
+    this.camera.y += (targetCamY - this.camera.y) * (1 - Math.exp(-dt * 8));
+    // Avoid the penguin drifting towards the right edge at maximum speed.
+    this.camera.x = Math.max(this.camera.x, game.player.position.x - worldWidth * 0.38);
 
     // Screen shake
     if (this.shakeTimer > 0) {
       this.shakeTimer -= dt;
-      this.shakeIntensity *= 0.85;
+      this.shakeIntensity *= Math.exp(-dt * 10);
     } else {
       this.shakeIntensity = 0;
     }
@@ -74,17 +94,16 @@ export class CanvasView {
 
     // Trigger shake on boulder hit (velocity loss is a proxy)
     // Trigger landing burst
-    const justLanded = game.player.justLanded && this.prevPlayerState === 'AIRBORNE';
+    const justLanded = dt > 0 && game.landedEvent;
     if (justLanded) {
       this.triggerLandingBurst(game.player.position);
     }
 
-    if (game.crashEvent) {
+    if (dt > 0 && game.crashEvent) {
       this.shakeTimer = 0.32;
       this.shakeIntensity = game.crashTimer > 0 ? 15 : 8;
       this.triggerLandingBurst(game.player.position);
     }
-    this.prevPlayerState = game.player.state;
 
     // Combo flash
     if (game.player.comboMultiplier > this.prevCombo) {
@@ -100,10 +119,11 @@ export class CanvasView {
 
     // 2. World Space Transformation
     this.ctx.save();
+    this.ctx.scale(scale, scale);
     this.ctx.translate(-this.camera.x + shakeX, -this.camera.y + shakeY);
 
     // Terrain
-    this.renderTerrain(game, width, height);
+    this.renderTerrain(game, worldWidth, worldHeight);
 
     // Pickups and Obstacles
     this.renderEntities(game.obstacles.entities);
@@ -113,7 +133,7 @@ export class CanvasView {
 
     // Speed lines (in world space, behind player)
     if (game.player.velocity.x > 650 || game.boostTimer > 0) {
-      this.renderSpeedLines(game, width, height);
+      this.renderSpeedLines(game, worldWidth, worldHeight);
     }
 
     // Leopard Seal
@@ -175,7 +195,8 @@ export class CanvasView {
       this.nextHazardDistance(game),
       game.magnetTimer,
       game.shieldActive,
-      game.crashTimer
+      game.crashTimer,
+      game.player.velocity.x
     );
   }
 
@@ -261,6 +282,7 @@ export class CanvasView {
 
   private renderEntities(entities: WorldEntity[]): void {
     for (const ent of entities) {
+      if (ent.position.x < this.camera.x - 100 || ent.position.x > this.camera.x + this.worldWidth() + 100) continue;
       const reusable = ent.type === 'SPEED_PAD' || ent.type === 'RAMP';
       if (ent.collected && (!reusable || ent.sealUsed)) continue;
 
@@ -435,7 +457,8 @@ export class CanvasView {
 
   private updateAndRenderParticles(game: GameSimulation, dt: number): void {
     // Spawn snow particles from penguin feet/belly
-    if (game.player.velocity.x > 80 && Math.random() < 0.7) {
+    if (!game.stats.gameOver && game.player.state !== 'AIRBORNE' && game.player.velocity.x > 80 &&
+        this.particles.length < 160 && Math.random() < 1 - Math.exp(-dt * 65)) {
       this.particles.push({
         x: game.player.position.x - 12,
         y: game.player.position.y - 2,
@@ -473,7 +496,7 @@ export class CanvasView {
     const groundY = game.terrain.getHeightAt(sealX);
 
     // Only render if within camera view
-    if (sealX < this.camera.x - 100 || sealX > this.camera.x + window.innerWidth + 100) return;
+    if (sealX < this.camera.x - 100 || sealX > this.camera.x + this.worldWidth() + 100) return;
 
     const entities = game.obstacles.entities;
     const obstacleLift = sealObstacleJumpHeight(sealX, entities);
@@ -560,7 +583,7 @@ export class CanvasView {
     }
     this.ctx.rotate(angle);
 
-    if (state === 'BELLY_SLIDE') {
+    if (state === 'BELLY_SLIDE' || state === 'AIRBORNE') {
       // Horizontal belly slider
       this.ctx.fillStyle = '#1e242b'; // Dark back
       this.ctx.beginPath();

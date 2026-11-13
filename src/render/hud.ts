@@ -14,7 +14,8 @@ export class HudRenderer {
     nextHazard?: number,
     magnetTimer = 0,
     shieldActive = false,
-    crashTimer = 0
+    crashTimer = 0,
+    playerSpeed = 0
   ): void {
     ctx.save();
 
@@ -35,12 +36,14 @@ export class HudRenderer {
     ctx.font = '14px sans-serif';
     ctx.fillStyle = '#b0e0e6';
     ctx.fillText(`SCORE: ${stats.score}`, 20, 48);
+    ctx.font = '12px sans-serif';
+    ctx.fillText(`SPEED ${Math.round(playerSpeed * 0.36)} km/h`, 20, 67);
 
     // Combo streak banner
     if (comboMultiplier > 1 && !stats.gameOver) {
       ctx.font = 'bold 15px sans-serif';
       ctx.fillStyle = '#ffdf00';
-      ctx.fillText(`COMBO x${comboMultiplier} SPEED!`, 20, 72);
+      ctx.fillText(`COMBO x${comboMultiplier}`, 20, 86);
     }
 
     // Top Right: Fish & Boost
@@ -52,7 +55,7 @@ export class HudRenderer {
     if (boostTimer > 0) {
       ctx.font = 'bold 14px sans-serif';
       ctx.fillStyle = '#ff4500';
-      ctx.fillText(`⚡ ROCKET SLIDE: ${boostTimer.toFixed(1)}s`, width - 20, 48);
+      ctx.fillText(`BOOST ${boostTimer.toFixed(1)}s`, width - 20, 48);
     }
 
     if (!stats.gameOver) {
@@ -69,14 +72,21 @@ export class HudRenderer {
       ctx.textAlign = 'center';
       ctx.font = 'bold 13px sans-serif';
       ctx.fillStyle = sealBoosting ? '#ffb34d' : '#ffffff';
-      ctx.fillText(sealBoosting ? 'SEAL BOOSTING!' : `SEAL: ${Math.ceil(sealDistance / 10)} m`, width / 2, 96);
+      const center = width / 2;
+      const barWidth = Math.min(150, width * 0.38);
+      ctx.fillStyle = '#193548';
+      ctx.fillRect(center - barWidth / 2, 114, barWidth, 6);
+      ctx.fillStyle = threatLevel === 'RED' ? '#ff5252' : threatLevel === 'YELLOW' ? '#ffc354' : '#7ce0ee';
+      ctx.fillRect(center - barWidth / 2, 114, barWidth * Math.min(1, sealDistance / 600), 6);
+      ctx.fillStyle = sealBoosting ? '#ffb34d' : '#ffffff';
+      ctx.fillText(sealBoosting ? 'SEAL BOOSTING!' : `SEAL: ${Math.ceil(sealDistance / 10)} m`, center, 96);
       if (crashTimer > 0) {
         ctx.fillStyle = '#ff7968';
-        ctx.fillText('RECOVERING...', width / 2, 136);
+        ctx.fillText('RECOVERING...', width / 2, 158);
       }
       if (nextHazard !== undefined && nextHazard < 900) {
         ctx.fillStyle = '#ffe18a';
-        ctx.fillText(`HAZARD AHEAD: ${Math.ceil(nextHazard / 10)} m`, width / 2, 116);
+        ctx.fillText(`HAZARD AHEAD: ${Math.ceil(nextHazard / 10)} m`, width / 2, 130);
       }
     }
 
@@ -118,7 +128,7 @@ export class HudRenderer {
       ctx.font = 'bold 16px sans-serif';
       ctx.fillStyle = '#ff2222';
       ctx.textAlign = 'center';
-      ctx.fillText('⚠ LEOPARD SEAL CLOSING IN! ⚠', width / 2, 25);
+      ctx.fillText('SEAL CLOSING IN!', width / 2, 6, Math.min(width * 0.50, 230));
     }
   }
 
@@ -140,7 +150,7 @@ export class HudRenderer {
     ctx.shadowBlur = 8;
 
     // Header
-    ctx.font = 'bold 28px -apple-system, sans-serif';
+    ctx.font = `bold ${Math.min(28, width * 0.066)}px -apple-system, sans-serif`;
     ctx.fillStyle = '#ff4d4d';
     ctx.fillText('CAUGHT BY THE SEAL!', centerX, centerY - 90);
 
@@ -152,12 +162,16 @@ export class HudRenderer {
 
     ctx.font = 'bold 16px sans-serif';
     ctx.fillStyle = '#ffd700';
-    ctx.fillText(`BEST SCORE: ${stats.highScore}`, centerX, centerY + 20);
+    ctx.fillText(`BEST SCORE: ${stats.highScore}`, centerX, centerY + 15);
+    ctx.font = '14px sans-serif';
+    ctx.fillStyle = '#bdeeff';
+    ctx.fillText(`BEST DISTANCE: ${stats.bestDistance} m`, centerX, centerY + 38);
+    ctx.fillText(`${stats.fishCount} fish  •  ${stats.hazardsCleared} clears  •  ${Math.floor(stats.elapsedSeconds)}s`, centerX, centerY + 60);
 
     // Call to Action
     const pulseAlpha = 0.5 + Math.sin(Date.now() / 250) * 0.5;
     ctx.fillStyle = `rgba(255, 255, 255, ${pulseAlpha.toFixed(2)})`;
-    ctx.font = 'bold 22px sans-serif';
-    ctx.fillText('TAP OR PRESS SPACE TO SLIDE AGAIN', centerX, centerY + 80);
+    ctx.font = 'bold 16px sans-serif';
+    ctx.fillText('TAP OR PRESS SPACE TO RETRY', centerX, centerY + 94, width - 32);
   }
 }

@@ -57,6 +57,15 @@ describe('ObstacleManager', () => {
     expect(manager.checkCollisions({ x: 0, y: 0 }, 16, { x: 0, y: 0 }, 145).map(e => e.id)).toEqual([1]);
   });
 
+  it('returns swept hits in order of first contact', () => {
+    const manager = new ObstacleManager();
+    manager.entities = [
+      { id: 2, type: 'FISH', position: { x: 150, y: 100 }, radius: 10 },
+      { id: 1, type: 'BOULDER', position: { x: 60, y: 100 }, radius: 16 }
+    ];
+    expect(manager.checkCollisions({ x: 200, y: 100 }, 16, { x: 0, y: 100 }).map(e => e.id)).toEqual([1, 2]);
+  });
+
   it('Review Focus #5: handles multiple simultaneous pickup collisions in one step', () => {
     const manager = new ObstacleManager();
     manager.entities = [

@@ -140,6 +140,41 @@ describe('GameSimulation Master Controller', () => {
     expect(game.crashTimer).toBe(0);
   });
 
+  it('preserves landing and jump events across simulation substeps', () => {
+    const game = new GameSimulation();
+    game.step(0.05, { isHoldingSlide: false, jumpPressed: true });
+    expect(game.jumpEvent).toBe(true);
+    game.step(0.05, { isHoldingSlide: false });
+    expect(game.jumpEvent).toBe(false);
+  });
+
+  it('enforces recovery speed in actual movement and ignores speed pads during recovery', () => {
+    const game = new GameSimulation();
+    game.crashTimer = 0.8;
+    game.player.stumbleTimer = 0.8;
+    game.obstacles.entities = [{ id: 99, type: 'SPEED_PAD', position: { ...game.player.position }, radius: 30 }];
+    const start = game.player.position.x;
+    game.step(0.1, { isHoldingSlide: true });
+    expect(game.player.position.x - start).toBeLessThanOrEqual(9.5 + 1e-6);
+    expect(game.boostTimer).toBe(0);
+  });
+
+  it('awards clean clears once and preserves best distance on restart', () => {
+    const game = new GameSimulation();
+    game.player.position = { x: 100, y: game.terrain.getHeightAt(100) - 200 };
+    game.player.state = 'AIRBORNE';
+    game.player.velocity = { x: 800, y: 0 };
+    game.obstacles.entities = [{ id: 99, type: 'BOULDER', position: { x: 130, y: game.terrain.getHeightAt(130) }, radius: 16 }];
+    game.step(0.15, { isHoldingSlide: false });
+    expect(game.stats.hazardsCleared).toBe(1);
+    game.step(0.1, { isHoldingSlide: false });
+    expect(game.stats.hazardsCleared).toBe(1);
+    const distance = game.stats.distanceMeters;
+    game.restart();
+    expect(game.stats.bestDistance).toBeGreaterThanOrEqual(distance);
+    expect(game.stats.hazardsCleared).toBe(0);
+  });
+
   it('Important #1: accumulates score at baseline walking speed at 60 FPS', () => {
     const game = new GameSimulation();
     game.player.velocity = { x: 150, y: 0 };

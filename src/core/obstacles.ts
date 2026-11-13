@@ -84,7 +84,7 @@ export class ObstacleManager {
   }
 
   checkCollisions(playerPos: Vector2, playerRadius: number, previousPos = playerPos, magnetRadius = 0): WorldEntity[] {
-    const hits: WorldEntity[] = [];
+    const hits: { entity: WorldEntity; t: number }[] = [];
     const vx = playerPos.x - previousPos.x;
     const vy = playerPos.y - previousPos.y;
     const lengthSq = vx * vx + vy * vy;
@@ -97,8 +97,17 @@ export class ObstacleManager {
       const dy = previousPos.y + t * vy - entity.position.y;
       const fish = entity.type === 'FISH' || entity.type === 'GOLD_FISH';
       const maxDist = playerRadius + entity.radius + (fish ? 8 + magnetRadius : 0);
-      if (dx * dx + dy * dy <= maxDist * maxDist) hits.push(entity);
+      if (dx * dx + dy * dy <= maxDist * maxDist) {
+        // Sort by first contact, rather than the order in which chunks were generated.
+        const along = (entity.position.x - previousPos.x) * vx + (entity.position.y - previousPos.y) * vy;
+        const fromX = previousPos.x - entity.position.x;
+        const fromY = previousPos.y - entity.position.y;
+        const c = fromX * fromX + fromY * fromY - maxDist * maxDist;
+        const entry = c <= 0 || lengthSq === 0 ? 0 : Math.max(0,
+          (along - Math.sqrt(Math.max(0, along * along - lengthSq * c))) / lengthSq);
+        hits.push({ entity, t: entry });
+      }
     }
-    return hits;
+    return hits.sort((a, b) => a.t - b.t || a.entity.id - b.entity.id).map(h => h.entity);
   }
 }

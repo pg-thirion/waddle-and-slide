@@ -90,6 +90,16 @@ describe('PenguinPlayer Physics & State Machine', () => {
     expect(player.velocity.y).toBeLessThan(0);
   });
 
+  it('does not advance on zero or negative time and respects a recovery speed cap', () => {
+    const terrain = new TerrainGenerator();
+    const player = new PenguinPlayer({ x: 100, y: terrain.getHeightAt(100) });
+    player.update(0, { isHoldingSlide: true }, terrain);
+    expect(player.position.x).toBe(100);
+    player.update(0.1, { isHoldingSlide: false, speedLimit: 95 }, terrain);
+    expect(player.position.x).toBeLessThanOrEqual(109.5 + 1e-6);
+    expect(player.velocity.x).toBeLessThanOrEqual(95);
+  });
+
   it('jump: cooldown prevents immediate double-jump', () => {
     const terrain = new TerrainGenerator();
     const player = new PenguinPlayer({ x: 100, y: terrain.getHeightAt(100) });
