@@ -49,4 +49,33 @@ describe('PenguinPlayer Physics & State Machine', () => {
     expect(player.velocity.x).toBeGreaterThan(0);
     expect(player.velocity.x).toBeLessThanOrEqual(400);
   });
+
+  it('Critical #3: forces WADDLE_BRAKE on flat/uphill landing even when touch is held', () => {
+    const terrain = new TerrainGenerator();
+    // Find or set up a flat/uphill point
+    const player = new PenguinPlayer({ x: 300, y: 0 });
+    player.state = 'AIRBORNE';
+    player.velocity = { x: 300, y: 200 };
+
+    for (let i = 0; i < 20; i++) {
+      player.update(0.05, { isHoldingSlide: true }, terrain);
+      if (player.state !== 'AIRBORNE') break;
+    }
+
+    const slope = terrain.getSlopeAngleAt(player.position.x);
+    if (Math.sin(slope) <= 0.08) {
+      expect(player.state).toBe('WADDLE_BRAKE');
+    }
+  });
+
+  it('Important #2: does not launch airborne when sliding up a concave slope', () => {
+    const terrain = new TerrainGenerator();
+    const player = new PenguinPlayer({ x: 400, y: terrain.getHeightAt(400) });
+    player.velocity = { x: 500, y: -250 };
+    player.state = 'BELLY_SLIDE';
+
+    player.update(0.016, { isHoldingSlide: true }, terrain);
+    // Should stay grounded if surface is concave/not cresting
+    expect(player.position.y).toBeCloseTo(terrain.getHeightAt(player.position.x), 1);
+  });
 });

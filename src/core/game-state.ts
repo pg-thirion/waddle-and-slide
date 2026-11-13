@@ -36,6 +36,7 @@ export class GameSimulation {
   obstacles: ObstacleManager;
   stats: GameStats;
   boostTimer: number;
+  private rawScore: number;
 
   constructor() {
     this.terrain = new TerrainGenerator();
@@ -44,6 +45,7 @@ export class GameSimulation {
     this.chaser = new LeopardSeal(350);
     this.obstacles = new ObstacleManager();
     this.boostTimer = 0;
+    this.rawScore = 0;
 
     this.stats = {
       score: 0,
@@ -87,17 +89,19 @@ export class GameSimulation {
       if (hit.type === 'FISH' && !hit.collected) {
         hit.collected = true;
         this.stats.fishCount++;
-        this.stats.score += 100 * this.player.comboMultiplier;
+        this.rawScore += 100 * this.player.comboMultiplier;
         if (this.stats.fishCount % 10 === 0) {
           this.boostTimer = 2.0; // 2s speed burst
         }
       } else if (hit.type === 'BOULDER') {
+        hit.hit = true;
         if (this.boostTimer <= 0) {
           this.player.velocity.x *= 0.5;
           this.player.state = 'WADDLE_BRAKE';
           this.player.comboMultiplier = 1;
         }
       } else if (hit.type === 'WALRUS') {
+        hit.hit = true;
         if (this.boostTimer <= 0) {
           this.player.velocity.x = Math.max(30, this.player.velocity.x * 0.3);
           this.player.comboMultiplier = 1;
@@ -118,7 +122,8 @@ export class GameSimulation {
     // Distance and score metrics
     const distPx = Math.max(0, this.player.position.x - 100);
     this.stats.distanceMeters = Math.floor(distPx / 10);
-    this.stats.score += Math.floor(this.player.velocity.x * dt * 0.2 * this.player.comboMultiplier);
+    this.rawScore += this.player.velocity.x * dt * 0.2 * this.player.comboMultiplier;
+    this.stats.score = Math.floor(this.rawScore);
   }
 
   restart(): void {
@@ -134,6 +139,7 @@ export class GameSimulation {
     this.obstacles = new ObstacleManager();
     this.obstacles.spawnAhead(startX, this.terrain);
     this.boostTimer = 0;
+    this.rawScore = 0;
 
     this.stats = {
       score: 0,

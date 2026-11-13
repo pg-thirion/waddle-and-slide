@@ -7,6 +7,7 @@ describe('Vector2 Math Library', () => {
     const v2 = vec2(1, -2);
     expect(vecAdd(v1, v2)).toEqual({ x: 4, y: 2 });
     expect(vecSub(v1, v2)).toEqual({ x: 2, y: 6 });
+    expect(vecScale(v1, 2)).toEqual({ x: 6, y: 8 });
   });
 
   it('calculates length and normalization safely', () => {

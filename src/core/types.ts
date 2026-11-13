@@ -20,6 +20,7 @@ export interface WorldEntity {
   position: Vector2;
   radius: number;
   collected?: boolean;
+  hit?: boolean;
 }
 
 export interface GameStats {

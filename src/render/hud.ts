@@ -121,7 +121,7 @@ export class HudRenderer {
 
     ctx.font = 'bold 16px sans-serif';
     ctx.fillStyle = '#ffd700';
-    ctx.fillText(`BEST DISTANCE: ${stats.highScore}`, centerX, centerY + 20);
+    ctx.fillText(`BEST SCORE: ${stats.highScore}`, centerX, centerY + 20);
 
     // Call to Action
     const pulseAlpha = 0.5 + Math.sin(Date.now() / 250) * 0.5;

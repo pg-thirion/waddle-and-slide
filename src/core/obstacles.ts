@@ -67,7 +67,7 @@ export class ObstacleManager {
     const hits: WorldEntity[] = [];
 
     for (const entity of this.entities) {
-      if (entity.collected) continue;
+      if (entity.collected || entity.hit) continue;
 
       const dx = playerPos.x - entity.position.x;
       const dy = playerPos.y - entity.position.y;

@@ -34,4 +34,33 @@ describe('GameSimulation Master Controller', () => {
     expect(game.stats.score).toBe(0);
     expect(game.stats.highScore).toBe(500);
   });
+
+  it('Critical #2: obstacle collision penalty is applied once per encounter without multi-frame crush', () => {
+    const game = new GameSimulation();
+    // Place a boulder right in front of player
+    game.obstacles.entities = [
+      { id: 99, type: 'BOULDER', position: { x: 120, y: game.terrain.getHeightAt(120) }, radius: 25 }
+    ];
+    game.player.velocity = { x: 400, y: 0 };
+
+    // Step across the boulder across several frames
+    for (let i = 0; i < 5; i++) {
+      game.step(0.016, { isHoldingSlide: true });
+    }
+
+    // Speed should have taken single 50% hit (~200 px/s), NOT 0.5^5 (~12.5 px/s)
+    expect(game.player.velocity.x).toBeGreaterThan(120);
+  });
+
+  it('Important #1: accumulates score at baseline walking speed at 60 FPS', () => {
+    const game = new GameSimulation();
+    game.player.velocity = { x: 150, y: 0 };
+
+    // 60 frames of 16ms
+    for (let i = 0; i < 60; i++) {
+      game.step(0.016, { isHoldingSlide: false });
+    }
+
+    expect(game.stats.score).toBeGreaterThan(0);
+  });
 });

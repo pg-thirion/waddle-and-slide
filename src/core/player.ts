@@ -8,6 +8,7 @@ export class PenguinPlayer {
   state: PlayerState;
   comboMultiplier: number;
   radius: number;
+  stumbleTimer: number;
 
   constructor(startPos: Vector2) {
     this.position = { ...startPos };
@@ -15,6 +16,7 @@ export class PenguinPlayer {
     this.state = 'WADDLE_BRAKE';
     this.comboMultiplier = 1;
     this.radius = 16;
+    this.stumbleTimer = 0;
   }
 
   update(dt: number, input: PlayerInput, terrain: TerrainGenerator): void {
@@ -62,21 +64,26 @@ export class PenguinPlayer {
           this.velocity.x = Math.max(50, boost * tanX);
           this.velocity.y = this.velocity.x * Math.tan(slope);
           this.comboMultiplier = Math.min(this.comboMultiplier + 1, 5);
+          this.state = input.isHoldingSlide ? 'BELLY_SLIDE' : 'WADDLE_BRAKE';
         } else {
-          // Flat or uphill impact penalty (Review Focus #2: preserve positive direction, no reverse)
-          const penalized = Math.max(50, tangentSpeed * 0.7);
-          this.velocity.x = Math.max(40, penalized * Math.abs(tanX));
+          // Flat or uphill impact penalty (Review Focus #2): clamp speed, 30% penalty, force WADDLE_BRAKE
+          this.velocity.x = Math.max(40, this.velocity.x * 0.7);
           this.velocity.y = this.velocity.x * Math.tan(slope);
           this.comboMultiplier = 1;
+          this.stumbleTimer = 0.3; // Stumble duration forcing brake
+          this.state = 'WADDLE_BRAKE';
         }
-
-        this.state = input.isHoldingSlide ? 'BELLY_SLIDE' : 'WADDLE_BRAKE';
       }
       return;
     }
 
     // Grounded physics: WADDLE_BRAKE vs BELLY_SLIDE
-    this.state = input.isHoldingSlide ? 'BELLY_SLIDE' : 'WADDLE_BRAKE';
+    if (this.stumbleTimer > 0) {
+      this.stumbleTimer -= dt;
+      this.state = 'WADDLE_BRAKE';
+    } else {
+      this.state = input.isHoldingSlide ? 'BELLY_SLIDE' : 'WADDLE_BRAKE';
+    }
     const slope = terrain.getSlopeAngleAt(this.position.x);
     const sinSlope = Math.sin(slope);
     const cosSlope = Math.cos(slope);
@@ -110,8 +117,9 @@ export class PenguinPlayer {
     const nextSlope = terrain.getSlopeAngleAt(this.position.x);
     this.velocity.y = this.velocity.x * Math.tan(nextSlope);
 
-    // Launch check: cresting ramps or hill crests with strong upward velocity
-    if (this.velocity.y < -220 && this.state === 'BELLY_SLIDE') {
+    // Launch check: only launch if cresting convex terrain or kicker ramp where ground drops away
+    const slopeDelta = nextSlope - slope;
+    if (this.velocity.y < -220 && this.state === 'BELLY_SLIDE' && slopeDelta <= 0.05) {
       this.state = 'AIRBORNE';
       this.position.y = nextGroundY - 2;
     } else {
