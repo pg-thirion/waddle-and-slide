@@ -65,14 +65,16 @@ export class GameSimulation {
     if (this.stats.gameOver) return;
 
     this.speedBoostPickedUp = false;
+    if (!Number.isFinite(dt) || dt <= 0) return;
 
     // Substep to ensure stable simulation over variable or large dt
-    const maxSubstep = 0.05;
+    const maxSubstep = 1 / 120;
     let remaining = Math.min(dt, 1.5);
 
     while (remaining > 0 && !this.stats.gameOver) {
       const stepDt = Math.min(remaining, maxSubstep);
       this.singleStep(stepDt, input);
+      input = { ...input, jumpPressed: false };
       remaining -= stepDt;
     }
   }
@@ -83,12 +85,14 @@ export class GameSimulation {
       this.player.velocity.x = Math.max(this.player.velocity.x, 800);
     }
 
+    const previousPos = { ...this.player.position };
+    const previousSealX = previousPos.x - this.chaser.trailingDistance;
     this.player.update(dt, input, this.terrain);
     this.obstacles.spawnAhead(this.player.position.x, this.terrain);
-    this.obstacles.cullBehind(this.player.position.x);
+
 
     // Collision handling
-    const hits = this.obstacles.checkCollisions(this.player.position, this.player.radius);
+    const hits = this.obstacles.checkCollisions(this.player.position, this.player.radius, previousPos);
     for (const hit of hits) {
       if (hit.type === 'FISH' && !hit.collected) {
         hit.collected = true;
@@ -97,19 +101,15 @@ export class GameSimulation {
         if (this.stats.fishCount % 10 === 0) {
           this.boostTimer = 2.0; // 2s speed burst
         }
-      } else if (hit.type === 'BOULDER') {
+      } else if (hit.type === 'BOULDER' || hit.type === 'WALRUS' || hit.type === 'ICE_HURDLE') {
         hit.hit = true;
-        if (this.boostTimer <= 0) {
-          this.player.velocity.x *= 0.5;
-          this.player.state = 'WADDLE_BRAKE';
-          this.player.comboMultiplier = 1;
-        }
-      } else if (hit.type === 'WALRUS') {
-        hit.hit = true;
-        if (this.boostTimer <= 0) {
-          this.player.velocity.x = Math.max(30, this.player.velocity.x * 0.3);
-          this.player.comboMultiplier = 1;
-        }
+        // Boosts are useful, but careless collisions still cost momentum.
+        this.boostTimer = 0;
+        const factor = hit.type === 'BOULDER' ? 0.5 : hit.type === 'WALRUS' ? 0.35 : 0.4;
+        this.player.velocity.x = Math.max(30, this.player.velocity.x * factor);
+        this.player.stumbleTimer = hit.type === 'ICE_HURDLE' ? 0.45 : 0.25;
+        if (this.player.state !== 'AIRBORNE') this.player.state = 'WADDLE_BRAKE';
+        this.player.comboMultiplier = 1;
       } else if (hit.type === 'SPEED_PAD' && !hit.collected) {
         hit.collected = true;
         this.boostTimer = 3.0;
@@ -124,7 +124,17 @@ export class GameSimulation {
     }
 
     // Chaser tracking
-    this.chaser.update(dt, this.player.velocity.x);
+    const distanceMeters = Math.max(0, (this.player.position.x - 100) / 10);
+    // Use actual movement, not post-collision velocity, to keep the seal's world position consistent.
+    this.chaser.update(dt, (this.player.position.x - previousPos.x) / dt, distanceMeters);
+    const sealX = this.player.position.x - this.chaser.trailingDistance;
+    for (const powerUp of this.obstacles.sealPowerUpsBetween(previousSealX, sealX)) {
+      powerUp.sealUsed = true;
+      if (powerUp.type === 'SPEED_PAD' || powerUp.type === 'RAMP') {
+        this.chaser.usePowerUp(powerUp.type);
+      }
+    }
+    this.obstacles.cullBehind(this.player.position.x, sealX);
     if (this.chaser.isCaught) {
       this.stats.gameOver = true;
       if (this.stats.score > this.stats.highScore) {

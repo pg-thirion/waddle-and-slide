@@ -52,6 +52,28 @@ describe('GameSimulation Master Controller', () => {
     expect(game.player.velocity.x).toBeGreaterThan(120);
   });
 
+  it('a hurdle cancels a player boost and slows the player', () => {
+    const game = new GameSimulation();
+    game.obstacles.entities = [
+      { id: 99, type: 'ICE_HURDLE', position: { x: 125, y: game.terrain.getHeightAt(125) - 24 }, radius: 24 }
+    ];
+    game.boostTimer = 3;
+    game.step(0.05, { isHoldingSlide: true });
+    expect(game.boostTimer).toBe(0);
+    expect(game.player.velocity.x).toBeLessThan(500);
+  });
+
+  it('the seal can use a pad already collected by the penguin', () => {
+    const game = new GameSimulation();
+    game.chaser.trailingDistance = 500;
+    game.obstacles.entities = [
+      { id: 99, type: 'SPEED_PAD', position: { x: -399, y: 0 }, radius: 20, collected: true }
+    ];
+    game.step(0.05, { isHoldingSlide: true });
+    expect(game.chaser.boostTimer).toBeGreaterThan(0);
+    expect(game.obstacles.entities[0].sealUsed).toBe(true);
+  });
+
   it('Important #1: accumulates score at baseline walking speed at 60 FPS', () => {
     const game = new GameSimulation();
     game.player.velocity = { x: 150, y: 0 };

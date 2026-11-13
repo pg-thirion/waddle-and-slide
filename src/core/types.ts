@@ -13,7 +13,7 @@ export interface PlayerInput {
 
 export type ThreatLevel = 'CALM' | 'YELLOW' | 'RED' | 'CAUGHT';
 
-export type EntityType = 'BOULDER' | 'WALRUS' | 'FISH' | 'SPEED_PAD' | 'RAMP';
+export type EntityType = 'BOULDER' | 'WALRUS' | 'FISH' | 'SPEED_PAD' | 'RAMP' | 'ICE_HURDLE';
 
 export interface WorldEntity {
   id: number;
@@ -22,6 +22,7 @@ export interface WorldEntity {
   radius: number;
   collected?: boolean;
   hit?: boolean;
+  sealUsed?: boolean;
 }
 
 export interface GameStats {

@@ -26,6 +26,22 @@ describe('ObstacleManager', () => {
     expect(hits[0].id).toBe(1);
   });
 
+  it('detects a swept hurdle collision at high speed', () => {
+    const manager = new ObstacleManager();
+    manager.entities = [{ id: 1, type: 'ICE_HURDLE', position: { x: 100, y: 100 }, radius: 24 }];
+    expect(manager.checkCollisions({ x: 200, y: 100 }, 16, { x: 0, y: 100 })).toHaveLength(1);
+    expect(manager.checkCollisions({ x: 200, y: 20 }, 16, { x: 0, y: 20 })).toHaveLength(0);
+  });
+
+  it('keeps collected pads until the pursuing seal passes', () => {
+    const manager = new ObstacleManager();
+    manager.entities = [{ id: 1, type: 'SPEED_PAD', position: { x: 100, y: 100 }, radius: 20, collected: true }];
+    manager.cullBehind(2000, 50);
+    expect(manager.sealPowerUpsBetween(50, 150)).toHaveLength(1);
+    manager.entities[0].sealUsed = true;
+    expect(manager.sealPowerUpsBetween(50, 150)).toHaveLength(0);
+  });
+
   it('Review Focus #5: handles multiple simultaneous pickup collisions in one step', () => {
     const manager = new ObstacleManager();
     manager.entities = [

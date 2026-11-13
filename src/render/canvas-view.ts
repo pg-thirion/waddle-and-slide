@@ -146,8 +146,22 @@ export class CanvasView {
       game.stats,
       game.chaser.threatLevel,
       game.player.comboMultiplier,
-      game.boostTimer
+      game.boostTimer,
+      game.chaser.trailingDistance,
+      game.chaser.boostTimer > 0 || game.chaser.rampTimer > 0,
+      this.nextHazardDistance(game)
     );
+  }
+
+  private nextHazardDistance(game: GameSimulation): number | undefined {
+    const x = game.player.position.x;
+    let nearest = Infinity;
+    for (const entity of game.obstacles.entities) {
+      if (!entity.hit && (entity.type === 'ICE_HURDLE' || entity.type === 'BOULDER' || entity.type === 'WALRUS') && entity.position.x > x) {
+        nearest = Math.min(nearest, entity.position.x - x);
+      }
+    }
+    return Number.isFinite(nearest) ? nearest : undefined;
   }
 
   private renderSkyAndMountains(width: number, height: number): void {
@@ -269,6 +283,17 @@ export class CanvasView {
         this.ctx.lineTo(-10, -8);
         this.ctx.closePath();
         this.ctx.fill();
+      } else if (ent.type === 'ICE_HURDLE') {
+        // Bright ice barrier with a contrasting top edge.
+        this.ctx.fillStyle = '#4e9bbd';
+        this.ctx.fillRect(-22, -24, 44, 48);
+        this.ctx.fillStyle = '#a5e5f8';
+        this.ctx.fillRect(-18, -20, 36, 40);
+        this.ctx.fillStyle = '#ffffff';
+        this.ctx.fillRect(-22, -24, 44, 5);
+        this.ctx.strokeStyle = '#32799d';
+        this.ctx.lineWidth = 2;
+        this.ctx.strokeRect(-22, -24, 44, 48);
       } else if (ent.type === 'SPEED_PAD') {
         // Glowing speed pad
         const pulse = 0.7 + Math.sin(Date.now() / 150) * 0.3;
@@ -400,7 +425,17 @@ export class CanvasView {
     if (sealX < this.camera.x - 100 || sealX > this.camera.x + window.innerWidth + 100) return;
 
     this.ctx.save();
-    this.ctx.translate(sealX, groundY - 14);
+    this.ctx.translate(sealX, groundY - 14 - (game.chaser.rampTimer > 0 ? Math.sin(game.chaser.rampTimer / 0.8 * Math.PI) * 65 : 0));
+    if (game.chaser.boostTimer > 0 || game.chaser.rampTimer > 0) {
+      this.ctx.strokeStyle = 'rgba(100, 230, 255, 0.85)';
+      this.ctx.lineWidth = 4;
+      for (let i = 0; i < 3; i++) {
+        this.ctx.beginPath();
+        this.ctx.moveTo(-28, -8 + i * 8);
+        this.ctx.lineTo(-65 - i * 8, -8 + i * 8);
+        this.ctx.stroke();
+      }
+    }
 
     // Sleek dark leopard seal body
     this.ctx.fillStyle = '#2f3c48';
