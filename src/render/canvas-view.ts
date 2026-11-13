@@ -1,5 +1,6 @@
 import { Vector2, WorldEntity } from '../core/types';
 import { GameSimulation } from '../core/game-state';
+import { sealObstacleJumpHeight } from '../core/chaser';
 import { HudRenderer } from './hud';
 
 interface Particle {
@@ -474,8 +475,34 @@ export class CanvasView {
     // Only render if within camera view
     if (sealX < this.camera.x - 100 || sealX > this.camera.x + window.innerWidth + 100) return;
 
+    const entities = game.obstacles.entities;
+    const obstacleLift = sealObstacleJumpHeight(sealX, entities);
+    const rampLift = game.chaser.rampTimer > 0 ? Math.sin(game.chaser.rampTimer / 0.8 * Math.PI) * 65 : 0;
+    const lift = Math.max(obstacleLift, rampLift);
+
+    // A ground shadow makes the height of the leap clear.
+    if (lift > 0) {
+      this.ctx.save();
+      this.ctx.globalAlpha = Math.max(0.12, 0.38 - lift / 400);
+      this.ctx.fillStyle = '#263c50';
+      this.ctx.beginPath();
+      this.ctx.ellipse(sealX, groundY + 1, 28 - lift * 0.07, 5, 0, 0, Math.PI * 2);
+      this.ctx.fill();
+      this.ctx.restore();
+    }
+
     this.ctx.save();
-    this.ctx.translate(sealX, groundY - 14 - (game.chaser.rampTimer > 0 ? Math.sin(game.chaser.rampTimer / 0.8 * Math.PI) * 65 : 0));
+    this.ctx.translate(sealX, groundY - 14 - lift);
+    if (lift > 0) {
+      // Nose up during takeoff and down during descent.
+      const left = sealObstacleJumpHeight(sealX - 3, entities);
+      const right = sealObstacleJumpHeight(sealX + 3, entities);
+      const arcSlope = (left - right) / 6;
+      const rampPitch = rampLift > obstacleLift
+        ? Math.cos(game.chaser.rampTimer / 0.8 * Math.PI) * 0.35 : 0;
+      const pitch = rampLift > obstacleLift ? rampPitch : Math.atan(arcSlope);
+      this.ctx.rotate(Math.max(-0.55, Math.min(0.55, pitch)));
+    }
     if (game.chaser.boostTimer > 0 || game.chaser.rampTimer > 0) {
       this.ctx.strokeStyle = 'rgba(100, 230, 255, 0.85)';
       this.ctx.lineWidth = 4;

@@ -1,4 +1,31 @@
-import { ThreatLevel } from './types';
+import { ThreatLevel, WorldEntity } from './types';
+
+// A world-space jump arc is independent of frame rate and pursuit speed.
+// Keep the seal airborne until its entire body has cleared the obstacle.
+export function sealObstacleJumpHeight(sealX: number, entities: readonly WorldEntity[]): number {
+  let height = 0;
+  const smooth = (t: number): number => {
+    const u = Math.max(0, Math.min(1, t));
+    return u * u * (3 - 2 * u);
+  };
+
+  for (const entity of entities) {
+    // A player collision does not remove the physical obstacle.
+    if (entity.type !== 'BOULDER' && entity.type !== 'WALRUS' && entity.type !== 'ICE_HURDLE') continue;
+    const relativeX = sealX - entity.position.x;
+    const clear = entity.radius + 42;
+    const approach = clear + 150;
+    const departure = clear + 125;
+    if (relativeX <= -approach || relativeX >= departure) continue;
+
+    const peak = entity.type === 'WALRUS' ? 110 : entity.type === 'ICE_HURDLE' ? 105 : 90;
+    const rise = smooth((relativeX + approach) / (approach - clear));
+    const fall = smooth((departure - relativeX) / (departure - clear));
+    // Blend overlapping obstacle arcs without snapping back to the ground.
+    height = Math.max(height, peak * Math.min(rise, fall));
+  }
+  return height;
+}
 
 export class LeopardSeal {
   trailingDistance: number;

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { LeopardSeal } from '../src/core/chaser';
+import { LeopardSeal, sealObstacleJumpHeight } from '../src/core/chaser';
+import { WorldEntity } from '../src/core/types';
 
 describe('LeopardSeal Chaser System', () => {
   it('closes distance when player speed is below baseline', () => {
@@ -37,6 +38,35 @@ describe('LeopardSeal Chaser System', () => {
     expect(seal.rampTimer).toBeGreaterThan(0);
     seal.trailingDistance = 100;
     expect(seal.usePowerUp('SPEED_PAD')).toBe(false);
+  });
+
+  it('leaps over boulders, walruses and ice hurdles before reaching them', () => {
+    const hazards: WorldEntity[] = [
+      { id: 1, type: 'BOULDER', position: { x: 1000, y: 400 }, radius: 16 },
+      { id: 2, type: 'WALRUS', position: { x: 1800, y: 400 }, radius: 32, hit: true },
+      { id: 3, type: 'ICE_HURDLE', position: { x: 2600, y: 400 }, radius: 24 }
+    ];
+    for (const hazard of hazards) {
+      const x = hazard.position.x;
+      expect(sealObstacleJumpHeight(x - 300, hazards)).toBe(0);
+      expect(sealObstacleJumpHeight(x - 120, hazards)).toBeGreaterThan(0);
+      expect(sealObstacleJumpHeight(x - 50, hazards)).toBeGreaterThan(80);
+      expect(sealObstacleJumpHeight(x, hazards)).toBeGreaterThan(80);
+      expect(sealObstacleJumpHeight(x + 50, hazards)).toBeGreaterThan(80);
+      expect(sealObstacleJumpHeight(x + 120, hazards)).toBeGreaterThan(0);
+      expect(sealObstacleJumpHeight(x + 300, hazards)).toBe(0);
+    }
+  });
+
+  it('ignores fish and pickups while blending nearby hazard jumps', () => {
+    const hazards: WorldEntity[] = [
+      { id: 1, type: 'FISH', position: { x: 100, y: 400 }, radius: 16 },
+      { id: 2, type: 'WALRUS', position: { x: 600, y: 400 }, radius: 32 },
+      { id: 3, type: 'ICE_HURDLE', position: { x: 780, y: 400 }, radius: 24 }
+    ];
+    expect(sealObstacleJumpHeight(100, hazards)).toBe(0);
+    expect(sealObstacleJumpHeight(690, hazards)).toBeGreaterThan(80);
+    expect(sealObstacleJumpHeight(1100, hazards)).toBe(0);
   });
 
   it('Review Focus #4: cleanly clamps distance to 0 and triggers CAUGHT without negative overshoot', () => {
