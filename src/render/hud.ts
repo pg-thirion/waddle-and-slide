@@ -85,8 +85,9 @@ export class HudRenderer {
         ctx.fillText('RECOVERING...', width / 2, 158);
       }
       if (nextHazard !== undefined && nextHazard < 900) {
-        ctx.fillStyle = '#ffe18a';
-        ctx.fillText(`HAZARD AHEAD: ${Math.ceil(nextHazard / 10)} m`, width / 2, 130);
+        const seconds = nextHazard / Math.max(1, playerSpeed);
+        ctx.fillStyle = seconds < 0.7 ? '#ff8b75' : '#ffe18a';
+        ctx.fillText(seconds < 0.7 && crashTimer <= 0 ? 'HAZARD! JUMP OR BRAKE' : `HAZARD AHEAD: ${Math.ceil(nextHazard / 10)} m`, width / 2, 130, width - 24);
       }
     }
 
@@ -144,6 +145,7 @@ export class HudRenderer {
 
     const centerX = width / 2;
     const centerY = height / 2;
+    const lineScale = Math.min(1, (height - 80) / 220);
 
     ctx.textAlign = 'center';
     ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
@@ -152,26 +154,26 @@ export class HudRenderer {
     // Header
     ctx.font = `bold ${Math.min(28, width * 0.066)}px -apple-system, sans-serif`;
     ctx.fillStyle = '#ff4d4d';
-    ctx.fillText('CAUGHT BY THE SEAL!', centerX, centerY - 90);
+    ctx.fillText('CAUGHT BY THE SEAL!', centerX, centerY - 90 * lineScale);
 
     // Metrics
     ctx.font = '18px sans-serif';
     ctx.fillStyle = '#ffffff';
-    ctx.fillText(`Distance: ${stats.distanceMeters} meters`, centerX, centerY - 45);
-    ctx.fillText(`Score: ${stats.score}`, centerX, centerY - 15);
+    ctx.fillText(`Distance: ${stats.distanceMeters} meters`, centerX, centerY - 45 * lineScale);
+    ctx.fillText(`Score: ${stats.score}`, centerX, centerY - 15 * lineScale);
 
     ctx.font = 'bold 16px sans-serif';
     ctx.fillStyle = '#ffd700';
-    ctx.fillText(`BEST SCORE: ${stats.highScore}`, centerX, centerY + 15);
+    ctx.fillText(`BEST SCORE: ${stats.highScore}`, centerX, centerY + 15 * lineScale);
     ctx.font = '14px sans-serif';
     ctx.fillStyle = '#bdeeff';
-    ctx.fillText(`BEST DISTANCE: ${stats.bestDistance} m`, centerX, centerY + 38);
-    ctx.fillText(`${stats.fishCount} fish  •  ${stats.hazardsCleared} clears  •  ${Math.floor(stats.elapsedSeconds)}s`, centerX, centerY + 60);
+    ctx.fillText(`BEST DISTANCE: ${stats.bestDistance} m`, centerX, centerY + 38 * lineScale);
+    ctx.fillText(`${stats.fishCount} fish  •  ${stats.hazardsCleared} clears  •  ${Math.floor(stats.elapsedSeconds)}s`, centerX, centerY + 60 * lineScale);
 
     // Call to Action
     const pulseAlpha = 0.5 + Math.sin(Date.now() / 250) * 0.5;
     ctx.fillStyle = `rgba(255, 255, 255, ${pulseAlpha.toFixed(2)})`;
     ctx.font = 'bold 16px sans-serif';
-    ctx.fillText('TAP OR PRESS SPACE TO RETRY', centerX, centerY + 94, width - 32);
+    ctx.fillText('TAP OR PRESS SPACE TO RETRY', centerX, centerY + 94 * lineScale, width - 32);
   }
 }

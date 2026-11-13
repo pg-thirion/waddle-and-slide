@@ -132,7 +132,7 @@ export class CanvasView {
     this.updateAndRenderParticles(game, dt);
 
     // Speed lines (in world space, behind player)
-    if (game.player.velocity.x > 650 || game.boostTimer > 0) {
+    if (!game.stats.gameOver && (game.player.velocity.x > 650 || game.boostTimer > 0)) {
       this.renderSpeedLines(game, worldWidth, worldHeight);
     }
 
@@ -176,8 +176,9 @@ export class CanvasView {
       this.ctx.strokeStyle = '#203747';
       this.ctx.lineWidth = 4;
       this.ctx.textAlign = 'center';
-      this.ctx.strokeText(game.pickupMessage, width / 2, height * 0.29);
-      this.ctx.fillText(game.pickupMessage, width / 2, height * 0.29);
+      const messageY = Math.max(176, height * 0.29);
+      this.ctx.strokeText(game.pickupMessage, width / 2, messageY, width - 24);
+      this.ctx.fillText(game.pickupMessage, width / 2, messageY, width - 24);
       this.ctx.restore();
     }
 
@@ -447,9 +448,10 @@ export class CanvasView {
     for (let i = 0; i < count; i++) {
       const lineY = camMid + (Math.random() - 0.5) * height * 0.9;
       const len = 60 + Math.random() * 120;
+      const end = camRight - Math.random() * 160;
       this.ctx.beginPath();
-      this.ctx.moveTo(camRight - len - Math.random() * 300, lineY);
-      this.ctx.lineTo(camRight - Math.random() * 80, lineY);
+      this.ctx.moveTo(end - len, lineY);
+      this.ctx.lineTo(end, lineY);
       this.ctx.stroke();
     }
     this.ctx.restore();

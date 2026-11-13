@@ -152,7 +152,7 @@ export class GameSimulation {
         }
       } else if (hit.type === 'SKY_ROCKET' && !hit.collected) {
         hit.collected = true;
-        if (recovering) continue;
+        if (recovering || this.crashTimer > 0) continue;
         this.boostTimer = Math.max(this.boostTimer, 2.2);
         this.player.velocity.x = Math.max(this.player.velocity.x, 1100);
         this.speedBoostPickedUp = true;
@@ -187,7 +187,7 @@ export class GameSimulation {
         this.player.comboMultiplier = 1;
       } else if (hit.type === 'SPEED_PAD' && !hit.collected) {
         hit.collected = true;
-        if (recovering) continue;
+        if (recovering || this.crashTimer > 0) continue;
         this.boostTimer = 3.0;
         this.player.velocity.x = Math.max(this.player.velocity.x, 950);
         this.speedBoostPickedUp = true;
@@ -232,8 +232,10 @@ export class GameSimulation {
       }
     }
     this.obstacles.cullBehind(this.player.position.x, sealX);
-    const liveIds = new Set(this.obstacles.entities.map(e => e.id));
-    for (const id of this.clearedHazards) if (!liveIds.has(id)) this.clearedHazards.delete(id);
+    if (this.clearedHazards.size > 0) {
+      const liveIds = new Set(this.obstacles.entities.map(e => e.id));
+      for (const id of this.clearedHazards) if (!liveIds.has(id)) this.clearedHazards.delete(id);
+    }
     if (this.chaser.isCaught) this.stats.gameOver = true;
 
     // Distance and score metrics

@@ -36,7 +36,10 @@ window.addEventListener('DOMContentLoaded', () => {
     pauseButton.textContent = 'Pause';
   };
   const startIfNeeded = () => {
-    if (!started || game.stats.gameOver) reset();
+    if (!started || game.stats.gameOver) {
+      clearInput();
+      reset();
+    }
   };
   const togglePause = () => {
     if (!started || game.stats.gameOver) return;
@@ -56,7 +59,8 @@ window.addEventListener('DOMContentLoaded', () => {
   view.reset(game);
   window.addEventListener('resize', () => {
     view.resize();
-    // Do not reset effects; the camera adapts on the next render.
+    if (!started || paused || game.stats.gameOver) view.reset(game);
+    // While running, the camera adapts on the next render.
   });
 
   canvas.addEventListener('pointerdown', e => {
@@ -150,8 +154,8 @@ window.addEventListener('DOMContentLoaded', () => {
     const w = window.innerWidth;
     const h = window.innerHeight;
     const center = w / 2;
-    const top = h * 0.30;
-    const line = Math.min(32, h * 0.065);
+    const top = h * (h < 400 ? 0.20 : 0.30);
+    const line = Math.min(32, (h - top - 64) / 7);
     ctx.save();
     ctx.fillStyle = 'rgba(10,30,48,.82)';
     ctx.fillRect(0, 0, w, h);
