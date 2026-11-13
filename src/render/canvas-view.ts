@@ -78,11 +78,10 @@ export class CanvasView {
       this.triggerLandingBurst(game.player.position);
     }
 
-    // Trigger shake on hazard hit: detected via state change to WADDLE_BRAKE at low speed
-    if (game.player.state === 'WADDLE_BRAKE' && this.prevPlayerState === 'BELLY_SLIDE'
-        && game.player.velocity.x < 250 && game.player.velocity.x > 30) {
-      this.shakeTimer = 0.2;
-      this.shakeIntensity = 5;
+    if (game.crashEvent) {
+      this.shakeTimer = 0.32;
+      this.shakeIntensity = game.crashTimer > 0 ? 15 : 8;
+      this.triggerLandingBurst(game.player.position);
     }
     this.prevPlayerState = game.player.state;
 
@@ -120,6 +119,16 @@ export class CanvasView {
     this.renderSeal(game);
 
     // Penguin Player
+    if (game.magnetTimer > 0 || game.shieldActive) {
+      this.ctx.save();
+      this.ctx.strokeStyle = game.shieldActive ? '#8effff' : '#ffd45b';
+      this.ctx.globalAlpha = 0.75;
+      this.ctx.lineWidth = 3;
+      this.ctx.beginPath();
+      this.ctx.arc(game.player.position.x, game.player.position.y - 12, 30 + Math.sin(Date.now() / 150) * 3, 0, Math.PI * 2);
+      this.ctx.stroke();
+      this.ctx.restore();
+    }
     this.renderPenguin(game);
 
     this.ctx.restore();
@@ -138,6 +147,19 @@ export class CanvasView {
       this.ctx.restore();
     }
 
+    if (game.pickupMessageTimer > 0 && !game.stats.gameOver) {
+      this.ctx.save();
+      this.ctx.globalAlpha = Math.min(1, game.pickupMessageTimer / 0.25);
+      this.ctx.font = 'bold 20px sans-serif';
+      this.ctx.fillStyle = game.crashTimer > 0 ? '#ff6a55' : '#fff0a8';
+      this.ctx.strokeStyle = '#203747';
+      this.ctx.lineWidth = 4;
+      this.ctx.textAlign = 'center';
+      this.ctx.strokeText(game.pickupMessage, width / 2, height * 0.29);
+      this.ctx.fillText(game.pickupMessage, width / 2, height * 0.29);
+      this.ctx.restore();
+    }
+
     // 4. UI HUD Overlay
     this.hud.render(
       this.ctx,
@@ -146,8 +168,25 @@ export class CanvasView {
       game.stats,
       game.chaser.threatLevel,
       game.player.comboMultiplier,
-      game.boostTimer
+      game.boostTimer,
+      game.chaser.trailingDistance,
+      game.chaser.boostTimer > 0 || game.chaser.rampTimer > 0,
+      this.nextHazardDistance(game),
+      game.magnetTimer,
+      game.shieldActive,
+      game.crashTimer
     );
+  }
+
+  private nextHazardDistance(game: GameSimulation): number | undefined {
+    const x = game.player.position.x;
+    let nearest = Infinity;
+    for (const entity of game.obstacles.entities) {
+      if (!entity.hit && (entity.type === 'ICE_HURDLE' || entity.type === 'BOULDER' || entity.type === 'WALRUS') && entity.position.x > x) {
+        nearest = Math.min(nearest, entity.position.x - x);
+      }
+    }
+    return Number.isFinite(nearest) ? nearest : undefined;
   }
 
   private renderSkyAndMountains(width: number, height: number): void {
@@ -221,12 +260,19 @@ export class CanvasView {
 
   private renderEntities(entities: WorldEntity[]): void {
     for (const ent of entities) {
-      if (ent.collected) continue;
+      const reusable = ent.type === 'SPEED_PAD' || ent.type === 'RAMP';
+      if (ent.collected && (!reusable || ent.sealUsed)) continue;
 
       this.ctx.save();
+      if (ent.collected) this.ctx.globalAlpha = 0.45;
       this.ctx.translate(ent.position.x, ent.position.y);
 
-      if (ent.type === 'FISH') {
+      if (ent.type === 'FISH' || ent.type === 'GOLD_FISH') {
+        if (ent.type === 'GOLD_FISH') {
+          this.ctx.scale(1.5, 1.5);
+          this.ctx.shadowColor = '#ffbc30';
+          this.ctx.shadowBlur = 15;
+        }
         // Golden Krill / Fish
         this.ctx.fillStyle = '#ffd700';
         this.ctx.beginPath();
@@ -246,6 +292,23 @@ export class CanvasView {
         this.ctx.beginPath();
         this.ctx.arc(4, -1, 1.5, 0, Math.PI * 2);
         this.ctx.fill();
+      } else if (ent.type === 'SKY_ROCKET' || ent.type === 'MAGNET' || ent.type === 'SHIELD') {
+        const color = ent.type === 'SKY_ROCKET' ? '#eaa0ff' : ent.type === 'MAGNET' ? '#ffd65b' : '#7dfbff';
+        this.ctx.shadowColor = color;
+        this.ctx.shadowBlur = 16;
+        this.ctx.fillStyle = '#213e5a';
+        this.ctx.strokeStyle = color;
+        this.ctx.lineWidth = 3;
+        this.ctx.beginPath();
+        this.ctx.arc(0, 0, 19, 0, Math.PI * 2);
+        this.ctx.fill();
+        this.ctx.stroke();
+        this.ctx.shadowBlur = 0;
+        this.ctx.fillStyle = color;
+        this.ctx.font = 'bold 22px sans-serif';
+        this.ctx.textAlign = 'center';
+        this.ctx.textBaseline = 'middle';
+        this.ctx.fillText(ent.type === 'SKY_ROCKET' ? '↑' : ent.type === 'MAGNET' ? 'M' : 'S', 0, 1);
       } else if (ent.type === 'BOULDER') {
         // Jagged ice rock
         this.ctx.fillStyle = '#657e93';
@@ -269,6 +332,17 @@ export class CanvasView {
         this.ctx.lineTo(-10, -8);
         this.ctx.closePath();
         this.ctx.fill();
+      } else if (ent.type === 'ICE_HURDLE') {
+        // Bright ice barrier with a contrasting top edge.
+        this.ctx.fillStyle = '#4e9bbd';
+        this.ctx.fillRect(-22, -24, 44, 48);
+        this.ctx.fillStyle = '#a5e5f8';
+        this.ctx.fillRect(-18, -20, 36, 40);
+        this.ctx.fillStyle = '#ffffff';
+        this.ctx.fillRect(-22, -24, 44, 5);
+        this.ctx.strokeStyle = '#32799d';
+        this.ctx.lineWidth = 2;
+        this.ctx.strokeRect(-22, -24, 44, 48);
       } else if (ent.type === 'SPEED_PAD') {
         // Glowing speed pad
         const pulse = 0.7 + Math.sin(Date.now() / 150) * 0.3;
@@ -296,7 +370,8 @@ export class CanvasView {
         this.ctx.stroke();
       } else if (ent.type === 'WALRUS') {
         // Slumbering Walrus
-        this.ctx.fillStyle = '#8b5a3c';
+        this.ctx.scale(1.2, 1.2);
+        this.ctx.fillStyle = ent.hit ? '#a57655' : '#8b5a3c';
         this.ctx.beginPath();
         this.ctx.ellipse(0, 4, 22, 14, 0, 0, Math.PI * 2);
         this.ctx.fill();
@@ -400,7 +475,17 @@ export class CanvasView {
     if (sealX < this.camera.x - 100 || sealX > this.camera.x + window.innerWidth + 100) return;
 
     this.ctx.save();
-    this.ctx.translate(sealX, groundY - 14);
+    this.ctx.translate(sealX, groundY - 14 - (game.chaser.rampTimer > 0 ? Math.sin(game.chaser.rampTimer / 0.8 * Math.PI) * 65 : 0));
+    if (game.chaser.boostTimer > 0 || game.chaser.rampTimer > 0) {
+      this.ctx.strokeStyle = 'rgba(100, 230, 255, 0.85)';
+      this.ctx.lineWidth = 4;
+      for (let i = 0; i < 3; i++) {
+        this.ctx.beginPath();
+        this.ctx.moveTo(-28, -8 + i * 8);
+        this.ctx.lineTo(-65 - i * 8, -8 + i * 8);
+        this.ctx.stroke();
+      }
+    }
 
     // Sleek dark leopard seal body
     this.ctx.fillStyle = '#2f3c48';

@@ -13,6 +13,7 @@ window.addEventListener('DOMContentLoaded', () => {
   view.resize();
   window.addEventListener('resize', () => view.resize());
 
+  let started = false;
   let isHoldingSlide = false;
   let lastFishCount = 0;
   let prevThreat = game.chaser.threatLevel;
@@ -39,6 +40,7 @@ window.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
+    started = true;
     isHoldingSlide = true;
     sound.playSlideWoosh(game.player.velocity.x / 1000);
   });
@@ -78,6 +80,7 @@ window.addEventListener('DOMContentLoaded', () => {
         return;
       }
 
+      started = true;
       if (!isHoldingSlide) {
         sound.playSlideWoosh(game.player.velocity.x / 1000);
       }
@@ -87,7 +90,8 @@ window.addEventListener('DOMContentLoaded', () => {
     if (e.code === 'ArrowUp' || e.code === 'KeyW') {
       e.preventDefault();
       sound.ensureContext();
-      if (!game.stats.gameOver) {
+      if (!game.stats.gameOver && !e.repeat) {
+        started = true;
         jumpPressed = true;
         sound.playJump();
       }
@@ -104,6 +108,11 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  window.addEventListener('blur', () => {
+    isHoldingSlide = false;
+    jumpPressed = false;
+  });
+
   // Game loop
   let lastTime = performance.now();
 
@@ -112,7 +121,7 @@ window.addEventListener('DOMContentLoaded', () => {
     lastTime = currentTime;
     const dt = Math.min(rawDt, 0.1);
 
-    game.step(dt, { isHoldingSlide, jumpPressed });
+    if (started && !document.hidden) game.step(dt, { isHoldingSlide, jumpPressed });
     jumpPressed = false; // consume after one frame
 
     // Landing sound
@@ -125,6 +134,11 @@ window.addEventListener('DOMContentLoaded', () => {
     if (game.stats.fishCount > lastFishCount) {
       sound.playFishPickup();
       lastFishCount = game.stats.fishCount;
+    }
+
+    if (game.crashEvent) {
+      sound.playLanding();
+      sound.playBrakingScrape();
     }
 
     if (game.speedBoostPickedUp) {
@@ -142,6 +156,33 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 
     view.render(game, dt);
+    if (!started) {
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        const w = window.innerWidth;
+        const h = window.innerHeight;
+        ctx.save();
+        ctx.fillStyle = 'rgba(10, 30, 48, 0.78)';
+        ctx.fillRect(0, 0, w, h);
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#ffffff';
+        ctx.font = `bold ${Math.min(42, w * 0.085)}px sans-serif`;
+        ctx.fillText('WADDLE & SLIDE', w / 2, h * 0.35);
+        ctx.font = 'bold 16px sans-serif';
+        ctx.fillStyle = '#bdeeff';
+        ctx.fillText('Escape the leopard seal!', w / 2, h * 0.44);
+        ctx.font = '14px sans-serif';
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText('Hold to slide • Release to brake', w / 2, h * 0.53);
+        ctx.fillText('Swipe up or press W / ↑ to jump', w / 2, h * 0.59);
+        ctx.fillText('Collect fish and aerial power-ups', w / 2, h * 0.65);
+        ctx.font = 'bold 17px sans-serif';
+        ctx.fillStyle = '#ffe18a';
+        ctx.fillText('TAP OR PRESS SPACE TO START', w / 2, h * 0.76);
+        ctx.restore();
+      }
+    }
 
     requestAnimationFrame(loop);
   }

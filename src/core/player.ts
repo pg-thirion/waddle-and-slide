@@ -97,7 +97,7 @@ export class PenguinPlayer {
 
     // Jump: only when grounded, cooldown expired, and jump input received
     if (input.jumpPressed && this.jumpCooldown <= 0 && this.stumbleTimer <= 0) {
-      this.velocity.y = -620; // upward impulse in canvas coords (up = negative y)
+      this.velocity.y = -700; // upward impulse in canvas coords (up = negative y)
       this.velocity.x = Math.max(this.velocity.x, 180); // ensure forward momentum
       this.state = 'AIRBORNE';
       this.jumpCooldown = 0.4;
