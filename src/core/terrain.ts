@@ -12,7 +12,7 @@ const DEFAULT_CONFIG: TerrainGeneratorConfig = {
   segmentWidth: 600,
   baseHeight: 450,
   hillAmplitude: 140,
-  seed: 42
+  seed: 0
 };
 
 export class TerrainGenerator {
