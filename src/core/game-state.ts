@@ -36,6 +36,7 @@ export class GameSimulation {
   obstacles: ObstacleManager;
   stats: GameStats;
   boostTimer: number;
+  speedBoostPickedUp: boolean;
   private rawScore: number;
 
   constructor() {
@@ -45,6 +46,7 @@ export class GameSimulation {
     this.chaser = new LeopardSeal(350);
     this.obstacles = new ObstacleManager();
     this.boostTimer = 0;
+    this.speedBoostPickedUp = false;
     this.rawScore = 0;
 
     this.stats = {
@@ -59,8 +61,10 @@ export class GameSimulation {
     this.obstacles.spawnAhead(startX, this.terrain);
   }
 
-  step(dt: number, input: { isHoldingSlide: boolean }): void {
+  step(dt: number, input: { isHoldingSlide: boolean; jumpPressed?: boolean }): void {
     if (this.stats.gameOver) return;
+
+    this.speedBoostPickedUp = false;
 
     // Substep to ensure stable simulation over variable or large dt
     const maxSubstep = 0.05;
@@ -73,7 +77,7 @@ export class GameSimulation {
     }
   }
 
-  private singleStep(dt: number, input: { isHoldingSlide: boolean }): void {
+  private singleStep(dt: number, input: { isHoldingSlide: boolean; jumpPressed?: boolean }): void {
     if (this.boostTimer > 0) {
       this.boostTimer -= dt;
       this.player.velocity.x = Math.max(this.player.velocity.x, 800);
@@ -106,6 +110,16 @@ export class GameSimulation {
           this.player.velocity.x = Math.max(30, this.player.velocity.x * 0.3);
           this.player.comboMultiplier = 1;
         }
+      } else if (hit.type === 'SPEED_PAD' && !hit.collected) {
+        hit.collected = true;
+        this.boostTimer = 3.0;
+        this.player.velocity.x = Math.max(this.player.velocity.x, 950);
+        this.speedBoostPickedUp = true;
+      } else if (hit.type === 'RAMP' && !hit.collected) {
+        hit.collected = true;
+        this.player.velocity.y = -700;
+        this.player.state = 'AIRBORNE';
+        this.player.comboMultiplier = Math.min(this.player.comboMultiplier + 1, 5);
       }
     }
 
@@ -139,6 +153,7 @@ export class GameSimulation {
     this.obstacles = new ObstacleManager();
     this.obstacles.spawnAhead(startX, this.terrain);
     this.boostTimer = 0;
+    this.speedBoostPickedUp = false;
     this.rawScore = 0;
 
     this.stats = {

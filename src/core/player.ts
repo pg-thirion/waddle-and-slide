@@ -9,6 +9,8 @@ export class PenguinPlayer {
   comboMultiplier: number;
   radius: number;
   stumbleTimer: number;
+  jumpCooldown: number;
+  justLanded: boolean;
 
   constructor(startPos: Vector2) {
     this.position = { ...startPos };
@@ -17,6 +19,8 @@ export class PenguinPlayer {
     this.comboMultiplier = 1;
     this.radius = 16;
     this.stumbleTimer = 0;
+    this.jumpCooldown = 0;
+    this.justLanded = false;
   }
 
   update(dt: number, input: PlayerInput, terrain: TerrainGenerator): void {
@@ -24,6 +28,7 @@ export class PenguinPlayer {
     const clampedDt = Math.max(0.001, Math.min(dt, 0.1));
     const stepSize = 0.016;
     let remaining = clampedDt;
+    this.justLanded = false;
 
     while (remaining > 0) {
       const step = Math.min(remaining, stepSize);
@@ -34,6 +39,9 @@ export class PenguinPlayer {
 
   private substep(dt: number, input: PlayerInput, terrain: TerrainGenerator): void {
     const g = 980; // gravity px/s^2
+
+    // Decrement jump cooldown
+    if (this.jumpCooldown > 0) this.jumpCooldown -= dt;
 
     if (this.state === 'AIRBORNE') {
       // Airborne gravity integration
@@ -73,6 +81,8 @@ export class PenguinPlayer {
           this.stumbleTimer = 0.3; // Stumble duration forcing brake
           this.state = 'WADDLE_BRAKE';
         }
+        this.justLanded = true;
+        this.jumpCooldown = 0.3;
       }
       return;
     }
@@ -84,6 +94,16 @@ export class PenguinPlayer {
     } else {
       this.state = input.isHoldingSlide ? 'BELLY_SLIDE' : 'WADDLE_BRAKE';
     }
+
+    // Jump: only when grounded, cooldown expired, and jump input received
+    if (input.jumpPressed && this.jumpCooldown <= 0 && this.stumbleTimer <= 0) {
+      this.velocity.y = -620; // upward impulse in canvas coords (up = negative y)
+      this.velocity.x = Math.max(this.velocity.x, 180); // ensure forward momentum
+      this.state = 'AIRBORNE';
+      this.jumpCooldown = 0.4;
+      return;
+    }
+
     const slope = terrain.getSlopeAngleAt(this.position.x);
     const sinSlope = Math.sin(slope);
     const cosSlope = Math.cos(slope);

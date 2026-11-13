@@ -22,7 +22,7 @@ export class ObstacleManager {
       const slope = terrain.getSlopeAngleAt(x);
 
       // Alternating spawn patterns based on distance
-      const pattern = Math.floor(this.lastSpawnX / 300) % 4;
+      const pattern = Math.floor(this.lastSpawnX / 300) % 6;
 
       if (pattern === 0 || pattern === 2) {
         // Arc of airborne krill/fish
@@ -53,6 +53,24 @@ export class ObstacleManager {
           type: 'WALRUS',
           position: { x, y: groundY - 18 },
           radius: 24
+        });
+      } else if (pattern === 4) {
+        // Speed pad pickup
+        this.entities.push({
+          id: this.nextId++,
+          type: 'SPEED_PAD',
+          position: { x, y: groundY - 20 },
+          radius: 18,
+          collected: false
+        });
+      } else if (pattern === 5 && slope > 0.1) {
+        // Ramp kicker — only on downhill sections
+        this.entities.push({
+          id: this.nextId++,
+          type: 'RAMP',
+          position: { x, y: groundY - 10 },
+          radius: 20,
+          collected: false
         });
       }
     }

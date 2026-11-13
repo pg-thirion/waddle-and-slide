@@ -8,11 +8,12 @@ export type PlayerState = 'WADDLE_BRAKE' | 'BELLY_SLIDE' | 'AIRBORNE';
 export interface PlayerInput {
   isHoldingSlide: boolean;
   isDiveRequested?: boolean;
+  jumpPressed?: boolean;
 }
 
 export type ThreatLevel = 'CALM' | 'YELLOW' | 'RED' | 'CAUGHT';
 
-export type EntityType = 'BOULDER' | 'WALRUS' | 'FISH';
+export type EntityType = 'BOULDER' | 'WALRUS' | 'FISH' | 'SPEED_PAD' | 'RAMP';
 
 export interface WorldEntity {
   id: number;

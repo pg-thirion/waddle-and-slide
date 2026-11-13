@@ -18,6 +18,11 @@ export class CanvasView {
   private hud: HudRenderer;
   private camera: Vector2;
   private particles: Particle[];
+  private shakeTimer: number;
+  private shakeIntensity: number;
+  private prevPlayerState: string;
+  private comboFlashTimer: number;
+  private prevCombo: number;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -27,6 +32,11 @@ export class CanvasView {
     this.hud = new HudRenderer();
     this.camera = { x: 100, y: 300 };
     this.particles = [];
+    this.shakeTimer = 0;
+    this.shakeIntensity = 0;
+    this.prevPlayerState = 'WADDLE_BRAKE';
+    this.comboFlashTimer = 0;
+    this.prevCombo = 1;
   }
 
   resize(): void {
@@ -51,6 +61,38 @@ export class CanvasView {
     this.camera.x += (targetCamX - this.camera.x) * 0.12;
     this.camera.y += (targetCamY - this.camera.y) * 0.08;
 
+    // Screen shake
+    if (this.shakeTimer > 0) {
+      this.shakeTimer -= dt;
+      this.shakeIntensity *= 0.85;
+    } else {
+      this.shakeIntensity = 0;
+    }
+    const shakeX = this.shakeIntensity > 0 ? (Math.random() - 0.5) * this.shakeIntensity * 2 : 0;
+    const shakeY = this.shakeIntensity > 0 ? (Math.random() - 0.5) * this.shakeIntensity * 2 : 0;
+
+    // Trigger shake on boulder hit (velocity loss is a proxy)
+    // Trigger landing burst
+    const justLanded = game.player.justLanded && this.prevPlayerState === 'AIRBORNE';
+    if (justLanded) {
+      this.triggerLandingBurst(game.player.position);
+    }
+
+    // Trigger shake on hazard hit: detected via state change to WADDLE_BRAKE at low speed
+    if (game.player.state === 'WADDLE_BRAKE' && this.prevPlayerState === 'BELLY_SLIDE'
+        && game.player.velocity.x < 250 && game.player.velocity.x > 30) {
+      this.shakeTimer = 0.2;
+      this.shakeIntensity = 5;
+    }
+    this.prevPlayerState = game.player.state;
+
+    // Combo flash
+    if (game.player.comboMultiplier > this.prevCombo) {
+      this.comboFlashTimer = 0.6;
+    }
+    if (this.comboFlashTimer > 0) this.comboFlashTimer -= dt;
+    this.prevCombo = game.player.comboMultiplier;
+
     this.ctx.clearRect(0, 0, width, height);
 
     // 1. Sky & Parallax Mountains
@@ -58,7 +100,7 @@ export class CanvasView {
 
     // 2. World Space Transformation
     this.ctx.save();
-    this.ctx.translate(-this.camera.x, -this.camera.y);
+    this.ctx.translate(-this.camera.x + shakeX, -this.camera.y + shakeY);
 
     // Terrain
     this.renderTerrain(game, width, height);
@@ -69,6 +111,11 @@ export class CanvasView {
     // Particles
     this.updateAndRenderParticles(game, dt);
 
+    // Speed lines (in world space, behind player)
+    if (game.player.velocity.x > 650 || game.boostTimer > 0) {
+      this.renderSpeedLines(game, width, height);
+    }
+
     // Leopard Seal
     this.renderSeal(game);
 
@@ -77,7 +124,21 @@ export class CanvasView {
 
     this.ctx.restore();
 
-    // 3. UI HUD Overlay
+    // 3. Combo flash text (screen space)
+    if (this.comboFlashTimer > 0 && game.player.comboMultiplier > 1) {
+      const alpha = Math.min(1, this.comboFlashTimer / 0.3);
+      this.ctx.save();
+      this.ctx.globalAlpha = alpha;
+      this.ctx.font = `bold ${28 + (game.player.comboMultiplier - 1) * 4}px sans-serif`;
+      this.ctx.fillStyle = '#ffdf00';
+      this.ctx.textAlign = 'center';
+      this.ctx.shadowColor = '#ff8800';
+      this.ctx.shadowBlur = 10;
+      this.ctx.fillText(`x${game.player.comboMultiplier}!`, width * 0.5, height * 0.35);
+      this.ctx.restore();
+    }
+
+    // 4. UI HUD Overlay
     this.hud.render(
       this.ctx,
       width,
@@ -208,6 +269,31 @@ export class CanvasView {
         this.ctx.lineTo(-10, -8);
         this.ctx.closePath();
         this.ctx.fill();
+      } else if (ent.type === 'SPEED_PAD') {
+        // Glowing speed pad
+        const pulse = 0.7 + Math.sin(Date.now() / 150) * 0.3;
+        this.ctx.fillStyle = `rgba(0, 220, 255, ${pulse.toFixed(2)})`;
+        this.ctx.beginPath();
+        this.ctx.ellipse(0, 0, 18, 8, 0, 0, Math.PI * 2);
+        this.ctx.fill();
+        this.ctx.fillStyle = '#ffff00';
+        this.ctx.font = 'bold 16px sans-serif';
+        this.ctx.textAlign = 'center';
+        this.ctx.textBaseline = 'middle';
+        this.ctx.fillText('⚡', 0, -1);
+      } else if (ent.type === 'RAMP') {
+        // Ramp kicker — angled snow wedge
+        this.ctx.fillStyle = '#c5e5f2';
+        this.ctx.beginPath();
+        this.ctx.moveTo(-20, 10);
+        this.ctx.lineTo(-20, 0);
+        this.ctx.lineTo(20, -14);
+        this.ctx.lineTo(20, 10);
+        this.ctx.closePath();
+        this.ctx.fill();
+        this.ctx.strokeStyle = '#ffffff';
+        this.ctx.lineWidth = 2;
+        this.ctx.stroke();
       } else if (ent.type === 'WALRUS') {
         // Slumbering Walrus
         this.ctx.fillStyle = '#8b5a3c';
@@ -235,6 +321,40 @@ export class CanvasView {
 
       this.ctx.restore();
     }
+  }
+
+  private triggerLandingBurst(pos: Vector2): void {
+    for (let i = 0; i < 18; i++) {
+      const angle = Math.PI + (Math.random() - 0.5) * Math.PI; // spray left/upward
+      const speed = 80 + Math.random() * 220;
+      this.particles.push({
+        x: pos.x,
+        y: pos.y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed - 60,
+        life: 0,
+        maxLife: 0.3 + Math.random() * 0.3,
+        size: 2 + Math.random() * 4
+      });
+    }
+  }
+
+  private renderSpeedLines(game: GameSimulation, width: number, height: number): void {
+    const camRight = this.camera.x + width;
+    const camMid = this.camera.y + height * 0.5;
+    const count = game.boostTimer > 0 ? 14 : 8;
+    this.ctx.save();
+    this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.18)';
+    this.ctx.lineWidth = 1.5;
+    for (let i = 0; i < count; i++) {
+      const lineY = camMid + (Math.random() - 0.5) * height * 0.9;
+      const len = 60 + Math.random() * 120;
+      this.ctx.beginPath();
+      this.ctx.moveTo(camRight - len - Math.random() * 300, lineY);
+      this.ctx.lineTo(camRight - Math.random() * 80, lineY);
+      this.ctx.stroke();
+    }
+    this.ctx.restore();
   }
 
   private updateAndRenderParticles(game: GameSimulation, dt: number): void {

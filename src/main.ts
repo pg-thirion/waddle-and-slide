@@ -17,11 +17,17 @@ window.addEventListener('DOMContentLoaded', () => {
   let lastFishCount = 0;
   let prevThreat = game.chaser.threatLevel;
   let prevGameOver = false;
+  let jumpPressed = false;
+  let touchStartY = 0;
+  let touchStartTime = 0;
+  let prevPlayerState = game.player.state;
 
   // Touch / Pointer controls
   window.addEventListener('pointerdown', (e) => {
     e.preventDefault();
     sound.ensureContext();
+    touchStartY = e.clientY;
+    touchStartTime = performance.now();
 
     if (game.stats.gameOver) {
       game.restart();
@@ -39,7 +45,14 @@ window.addEventListener('DOMContentLoaded', () => {
 
   window.addEventListener('pointerup', (e) => {
     e.preventDefault();
-    if (isHoldingSlide && !game.stats.gameOver) {
+    const dy = touchStartY - e.clientY; // positive = swipe up
+    const dt = performance.now() - touchStartTime;
+
+    if (!game.stats.gameOver && dy > 70 && dt < 350) {
+      // Swipe up = jump
+      jumpPressed = true;
+      sound.playJump();
+    } else if (isHoldingSlide && !game.stats.gameOver) {
       sound.playBrakingScrape();
     }
     isHoldingSlide = false;
@@ -70,6 +83,15 @@ window.addEventListener('DOMContentLoaded', () => {
       }
       isHoldingSlide = true;
     }
+
+    if (e.code === 'ArrowUp' || e.code === 'KeyW') {
+      e.preventDefault();
+      sound.ensureContext();
+      if (!game.stats.gameOver) {
+        jumpPressed = true;
+        sound.playJump();
+      }
+    }
   });
 
   window.addEventListener('keyup', (e) => {
@@ -90,12 +112,23 @@ window.addEventListener('DOMContentLoaded', () => {
     lastTime = currentTime;
     const dt = Math.min(rawDt, 0.1);
 
-    game.step(dt, { isHoldingSlide });
+    game.step(dt, { isHoldingSlide, jumpPressed });
+    jumpPressed = false; // consume after one frame
+
+    // Landing sound
+    if (game.player.justLanded && prevPlayerState === 'AIRBORNE') {
+      sound.playLanding();
+    }
+    prevPlayerState = game.player.state;
 
     // Sound effect trigger checks
     if (game.stats.fishCount > lastFishCount) {
       sound.playFishPickup();
       lastFishCount = game.stats.fishCount;
+    }
+
+    if (game.speedBoostPickedUp) {
+      sound.playSpeedBoost();
     }
 
     if (game.chaser.threatLevel === 'RED' && prevThreat !== 'RED') {

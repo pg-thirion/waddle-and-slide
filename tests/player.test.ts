@@ -78,4 +78,32 @@ describe('PenguinPlayer Physics & State Machine', () => {
     // Should stay grounded if surface is concave/not cresting
     expect(player.position.y).toBeCloseTo(terrain.getHeightAt(player.position.x), 1);
   });
+
+  it('jump: jumpPressed sets state to AIRBORNE with negative velocity.y', () => {
+    const terrain = new TerrainGenerator();
+    const player = new PenguinPlayer({ x: 100, y: terrain.getHeightAt(100) });
+    player.state = 'WADDLE_BRAKE';
+    player.jumpCooldown = 0;
+
+    player.update(0.016, { isHoldingSlide: false, jumpPressed: true }, terrain);
+    expect(player.state).toBe('AIRBORNE');
+    expect(player.velocity.y).toBeLessThan(0);
+  });
+
+  it('jump: cooldown prevents immediate double-jump', () => {
+    const terrain = new TerrainGenerator();
+    const player = new PenguinPlayer({ x: 100, y: terrain.getHeightAt(100) });
+    player.state = 'WADDLE_BRAKE';
+    player.jumpCooldown = 0;
+
+    // First jump
+    player.update(0.016, { isHoldingSlide: false, jumpPressed: true }, terrain);
+    const vy1 = player.velocity.y;
+    expect(player.state).toBe('AIRBORNE');
+
+    // Immediate second jump attempt — cooldown should block it
+    player.update(0.016, { isHoldingSlide: false, jumpPressed: true }, terrain);
+    // velocity.y should not reset to a new high negative — gravity increases it slightly
+    expect(player.velocity.y).toBeGreaterThan(vy1);
+  });
 });
