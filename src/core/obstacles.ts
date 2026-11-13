@@ -40,15 +40,15 @@ export class ObstacleManager {
       const roll = this.random(index, 2);
       const slope = terrain.getSlopeAngleAt(x);
       // A gentle opening, then a varied mix with a growing hazard share.
-      if (index === 1 || (index > 3 && roll < 0.25 - difficulty * 0.08)) {
+      if (index === 1 || (index > 4 && roll < 0.25 - difficulty * 0.08)) {
         // Ground fish are reachable without jumping; the high trail rewards jumping.
         for (let i = 0; i < 3; i++) {
           this.add('FISH', x + i * 38, 8, 16, terrain);
         }
         this.aerialTrail(x + 110, terrain, index);
-      } else if (index === 0 || (index > 3 && roll < 0.43 - difficulty * 0.13)) {
+      } else if (index === 0 || (index > 4 && roll < 0.43 - difficulty * 0.13)) {
         this.add('SPEED_PAD', x, 12, 20, terrain);
-      } else if (index === 2 || (index > 3 && roll < 0.56 - difficulty * 0.12 && slope > 0.08)) {
+      } else if (index === 2 || (index > 4 && roll < 0.56 - difficulty * 0.12 && slope > 0.08)) {
         this.add('RAMP', x, 10, 20, terrain);
         // Ramp launches create a second aerial path at typical boost speeds.
         this.add('FISH', x + 120, 95, 20, terrain);
