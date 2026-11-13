@@ -114,6 +114,21 @@ describe('GameSimulation Master Controller', () => {
     expect(game.crashTimer).toBe(0);
   });
 
+  it('aerial pickups apply their own distinct effects', () => {
+    const game = new GameSimulation();
+    const pos = { ...game.player.position };
+    game.obstacles.entities = [
+      { id: 99, type: 'MAGNET', position: pos, radius: 25 },
+      { id: 100, type: 'SHIELD', position: pos, radius: 25 },
+      { id: 101, type: 'SKY_ROCKET', position: pos, radius: 25 }
+    ];
+    game.step(0.016, { isHoldingSlide: true });
+    expect(game.magnetTimer).toBeGreaterThan(5);
+    expect(game.shieldActive).toBe(true);
+    expect(game.boostTimer).toBeGreaterThan(2);
+    expect(game.player.velocity.x).toBeGreaterThan(1000);
+  });
+
   it('restart clears all special effects', () => {
     const game = new GameSimulation();
     game.magnetTimer = 6;

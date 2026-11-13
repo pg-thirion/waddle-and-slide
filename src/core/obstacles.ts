@@ -23,7 +23,7 @@ export class ObstacleManager {
     const offsets = [55, 105, 155, 195, 155, 105, 55];
     for (let i = 0; i < offsets.length; i++) {
       const type: EntityType = i === 3
-        ? (['SKY_ROCKET', 'MAGNET', 'SHIELD', 'GOLD_FISH'] as const)[Math.floor(this.random(index, 7) * 4)]
+        ? (['SKY_ROCKET', 'MAGNET', 'SHIELD', 'GOLD_FISH'] as const)[index === 1 ? 1 : Math.floor(this.random(index, 7) * 4)]
         : 'FISH';
       this.add(type, x + i * 52, offsets[i], i === 3 ? 25 : 16, terrain);
     }
@@ -56,6 +56,9 @@ export class ObstacleManager {
         this.add('SKY_ROCKET', x + 320, 190, 28, terrain);
         this.add('FISH', x + 420, 170, 20, terrain);
         this.add('GOLD_FISH', x + 490, 130, 23, terrain);
+      } else if (index === 4) {
+        this.add('WALRUS', x, 16, 32, terrain);
+        this.add('SHIELD', x + 25, 145, 25, terrain);
       } else if (index === 3 || this.random(index, 3) < 0.46 + difficulty * 0.20) {
         this.add('ICE_HURDLE', x, 24, 24, terrain);
         this.add('GOLD_FISH', x + 25, 135, 23, terrain);

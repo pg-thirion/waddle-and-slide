@@ -45,8 +45,11 @@ describe('ObstacleManager', () => {
   it('spawns high aerial rewards and magnet attracts only fish', () => {
     const terrain = new TerrainGenerator();
     const manager = new ObstacleManager();
-    manager.spawnAhead(100, terrain);
+    manager.spawnAhead(5000, terrain);
     expect(manager.entities.some(e => terrain.getHeightAt(e.position.x) - e.position.y >= 150)).toBe(true);
+    expect(manager.entities.some(e => e.type === 'MAGNET')).toBe(true);
+    expect(manager.entities.some(e => e.type === 'WALRUS')).toBe(true);
+    expect(manager.entities.some(e => e.type === 'SHIELD')).toBe(true);
     manager.entities = [
       { id: 1, type: 'FISH', position: { x: 120, y: 0 }, radius: 16 },
       { id: 2, type: 'WALRUS', position: { x: 120, y: 0 }, radius: 32 }
