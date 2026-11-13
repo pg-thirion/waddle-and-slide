@@ -68,7 +68,7 @@ export class GameSimulation {
     if (!Number.isFinite(dt) || dt <= 0) return;
 
     // Substep to ensure stable simulation over variable or large dt
-    const maxSubstep = 1 / 120;
+    const maxSubstep = 0.05;
     let remaining = Math.min(dt, 1.5);
 
     while (remaining > 0 && !this.stats.gameOver) {

@@ -52,6 +52,13 @@ describe('GameSimulation Master Controller', () => {
     expect(game.player.velocity.x).toBeGreaterThan(120);
   });
 
+  it('allows a forgiving opening before increasing pursuit pressure', () => {
+    const game = new GameSimulation();
+    for (let i = 0; i < 180; i++) game.step(1 / 60, { isHoldingSlide: true });
+    expect(game.stats.gameOver).toBe(false);
+    expect(game.stats.distanceMeters).toBeGreaterThan(50);
+  });
+
   it('a hurdle cancels a player boost and slows the player', () => {
     const game = new GameSimulation();
     game.obstacles.entities = [

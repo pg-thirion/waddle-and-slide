@@ -24,16 +24,16 @@ export class ObstacleManager {
       const index = this.slot++;
       const difficulty = Math.min(1, Math.max(0, (this.lastSpawnX - 100) / 25000));
       // Keep enough runway for jumping, even as hazards become more frequent.
-      this.lastSpawnX += Math.round(760 - difficulty * 180 + this.random(index, 1) * 220);
+      this.lastSpawnX += index === 0 ? 300 : index === 1 ? 350 : Math.round(760 - difficulty * 180 + this.random(index, 1) * 220);
       const x = this.lastSpawnX;
       const roll = this.random(index, 2);
       const slope = terrain.getSlopeAngleAt(x);
       // A gentle opening, then a varied mix with a growing hazard share.
-      if (index === 0 || (index > 3 && roll < 0.25 - difficulty * 0.08)) {
+      if (index === 1 || (index > 3 && roll < 0.25 - difficulty * 0.08)) {
         for (let i = 0; i < 3; i++) {
           this.add('FISH', x + i * 40, 25 + Math.sin(i * Math.PI / 2) * 45, 12, terrain);
         }
-      } else if (index === 1 || (index > 3 && roll < 0.43 - difficulty * 0.13)) {
+      } else if (index === 0 || (index > 3 && roll < 0.43 - difficulty * 0.13)) {
         this.add('SPEED_PAD', x, 12, 20, terrain);
       } else if (index === 2 || (index > 3 && roll < 0.56 - difficulty * 0.12 && slope > 0.08)) {
         this.add('RAMP', x, 10, 20, terrain);

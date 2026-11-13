@@ -24,7 +24,7 @@ describe('LeopardSeal Chaser System', () => {
 
   it('closes a large gap even at high player speed without teleporting', () => {
     const seal = new LeopardSeal(850);
-    for (let i = 0; i < 600; i++) seal.update(1 / 120, 1200, 800);
+    for (let i = 0; i < 960; i++) seal.update(1 / 120, 1200, 800);
     expect(seal.trailingDistance).toBeLessThan(850);
     expect(seal.trailingDistance).toBeGreaterThan(0);
   });

@@ -31,11 +31,13 @@ export class LeopardSeal {
     }
 
     // Gradual progression and gap-dependent pursuit. No teleporting or distance cap.
-    const difficulty = Math.min(1, Math.max(0, distanceMeters / 2500));
+    const difficulty = Math.min(1, Math.max(0, distanceMeters / 4500));
     const catchUp = Math.max(0, Math.min(1, (this.trailingDistance - 220) / 330));
-    const base = 190 + difficulty * 310;
-    const relative = playerSpeed * (0.74 + 0.26 * catchUp)
-      + 25 + difficulty * 75 + catchUp * 100;
+    const opening = Math.min(1, Math.max(0, (distanceMeters - 500) / 1000));
+    const lunge = 85 + 150 * Math.max(0, 1 - this.trailingDistance / 100);
+    const base = Math.max(lunge, 85 + opening * 105 + difficulty * 310);
+    const relative = playerSpeed * (0.55 + 0.19 * opening + (0.45 - 0.19 * opening) * catchUp)
+      + 10 + opening * 15 + difficulty * 75 + catchUp * 100;
     const power = (this.boostTimer > 0 ? 240 : 0) + (this.rampTimer > 0 ? 100 : 0);
     const target = Math.min(1850, Math.max(base, relative) + power * catchUp);
     // Accelerate smoothly, and back off quickly when the penguin earns an escape.

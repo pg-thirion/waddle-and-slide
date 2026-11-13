@@ -235,9 +235,11 @@ export class CanvasView {
 
   private renderEntities(entities: WorldEntity[]): void {
     for (const ent of entities) {
-      if (ent.collected) continue;
+      const reusable = ent.type === 'SPEED_PAD' || ent.type === 'RAMP';
+      if (ent.collected && (!reusable || ent.sealUsed)) continue;
 
       this.ctx.save();
+      if (ent.collected) this.ctx.globalAlpha = 0.45;
       this.ctx.translate(ent.position.x, ent.position.y);
 
       if (ent.type === 'FISH') {
